@@ -173,6 +173,18 @@ def _get_current_edition() -> dict:
     return {"items": [], "stats": {}, "created_at": None, "hero_idx": 0}
 
 
+def _truncate_word(text: str, limit: int) -> str:
+    """Truncate text at a word boundary, no mid-word cuts."""
+    if len(text) <= limit:
+        return text
+    # Find last space before the limit
+    cut = text[:limit].rfind(" ")
+    if cut < limit * 0.5:
+        # No good break point — just use the limit
+        cut = limit
+    return text[:cut].rstrip() + "..."
+
+
 def _relative_time(iso_str: str) -> str:
     """Convert ISO timestamp to relative time string."""
     try:
@@ -286,6 +298,7 @@ async def homepage(request: Request):
         "stats": edition.get("stats", {}),
         "updated_at": edition.get("created_at"),
         "relative_time": _relative_time,
+        "trunc": _truncate_word,
     })
 
 

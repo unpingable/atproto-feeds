@@ -281,15 +281,15 @@
             <div class="lead-kicker">{{ lead_kicker_parts | join(" / ") or "top ranked" }}</div>
             <h2 class="lead-headline">
                 <a href="{{ lead.web_url }}">
-                    {%- if lead.display_headline %}{{ lead.display_headline[:120] }}{% if lead.display_headline|length > 120 %}...{% endif %}
-                    {%- elif lead.text %}{{ lead.text[:120] }}{% if lead.text|length > 120 %}...{% endif %}
+                    {%- if lead.display_headline %}{{ trunc(lead.display_headline, 140) }}
+                    {%- elif lead.text %}{{ trunc(lead.text, 140) }}
                     {%- else %}View post{% endif -%}
                 </a>
             </h2>
-            {% if lead.text and lead.display_headline != lead.text %}
-            <p class="lead-excerpt">{{ lead.text[:280] }}{% if lead.text|length > 280 %}...{% endif %}</p>
-            {% elif lead.text|length > 120 %}
-            <p class="lead-excerpt">{{ lead.text[120:400] }}{% if lead.text|length > 400 %}...{% endif %}</p>
+            {% if lead.text and lead.display_headline != lead.text and lead.text|length > 20 %}
+            <p class="lead-excerpt">{{ trunc(lead.text, 300) }}</p>
+            {% elif lead.text|length > 160 %}
+            <p class="lead-excerpt">{{ trunc(lead.text, 300) }}</p>
             {% endif %}
             <div class="lead-byline">
                 <a href="https://bsky.app/profile/{{ lead.author_handle }}">@{{ lead.author_handle }}</a>
@@ -354,11 +354,11 @@
                 <article class="col-item">
                     <div class="col-item-headline">
                         <a href="{{ item.web_url }}">
-                            {{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}
+                            {{ trunc(item.display_headline or item.text, 90) }}
                         </a>
                     </div>
                     {% if item.text and item.display_headline != item.text %}
-                    <div class="col-item-excerpt">{{ item.text[:160] }}</div>
+                    <div class="col-item-excerpt">{{ trunc(item.text, 160) }}</div>
                     {% endif %}
                     <div class="col-item-meta">
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
@@ -405,10 +405,10 @@
                 {% for item in graph_posts %}
                 <article class="col-item">
                     <div class="col-item-headline">
-                        <a href="{{ item.web_url }}">{{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}</a>
+                        <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 90) }}</a>
                     </div>
                     {% if item.text|length > 80 %}
-                    <div class="col-item-excerpt">{{ item.text[:160] }}</div>
+                    <div class="col-item-excerpt">{{ trunc(item.text, 160) }}</div>
                     {% endif %}
                     <div class="col-item-meta">
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
@@ -474,7 +474,7 @@
                     {% for item in wire_posts[:5] %}
                     <article class="col-item">
                         <div class="col-item-headline">
-                            <a href="{{ item.web_url }}">{{ item.text[:70] }}{% if item.text|length > 70 %}...{% endif %}</a>
+                            <a href="{{ item.web_url }}">{{ trunc(item.text, 75) }}</a>
                         </div>
                         <div class="col-item-meta">
                             <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
@@ -499,7 +499,7 @@
                     {% if loop.index0 % 2 == 0 %}
                     <article class="col-item">
                         <div class="col-item-headline">
-                            <a href="{{ item.web_url }}">{{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}</a>
+                            <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 90) }}</a>
                         </div>
                         <div class="col-item-meta">
                             <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
@@ -515,7 +515,7 @@
                     {% if loop.index0 % 2 == 1 %}
                     <article class="col-item">
                         <div class="col-item-headline">
-                            <a href="{{ item.web_url }}">{{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}</a>
+                            <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 90) }}</a>
                         </div>
                         <div class="col-item-meta">
                             <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
