@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Instant Internet News{% endblock %}</title>
+    {% set page_description %}{% block description %}A source-first Bluesky signal desk. Less repost sludge. More people showing their work.{% endblock %}{% endset %}
+    <meta name="description" content="{{ page_description }}">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Instant Internet News">
+    <meta property="og:title" content="{% block og_title %}Instant Internet News{% endblock %}">
+    <meta property="og:description" content="{{ page_description }}">
+    <meta property="og:url" content="https://instantinternet.news{% block og_path %}/{% endblock %}">
+
+    <!-- Twitter/Bluesky card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Instant Internet News">
+    <meta name="twitter:description" content="{{ page_description }}">
+
+    <!-- Misc -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="canonical" href="https://instantinternet.news{% block canonical_path %}/{% endblock %}">
+    <meta name="theme-color" content="#0c0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0c0c0e;
+            --bg-raised: #141418;
+            --bg-inset: #0a0a0c;
+            --fg: #c8c5be;
+            --fg-dim: #6e6b63;
+            --fg-bright: #e8e5dd;
+            --accent: #b8a47a;
+            --accent-dim: #7a6f52;
+            --tag-mutual: #5b7a5e;
+            --tag-original: #5a6e80;
+            --tag-source: #8a6a4a;
+            --tag-link: #6a5a7a;
+            --tag-substance: #5a6a6a;
+            --tag-penalty: #7a4a4a;
+            --border: #2a2a2e;
+            --border-accent: #3a3530;
+            --rule: #3a3a3e;
+            --rule-heavy: #4a4a4e;
+            --mono: 'DM Mono', 'Menlo', monospace;
+            --serif: 'Newsreader', 'Georgia', serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--serif);
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .wrap {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        .wrap-wide {
+            max-width: 1020px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* --- Nameplate --- */
+        .nameplate {
+            text-align: center;
+            padding: 24px 0 0;
+        }
+        .nameplate-rule {
+            border: none;
+            border-top: 2px solid var(--rule-heavy);
+            margin: 0;
+        }
+        .nameplate-rule-thin {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 0;
+        }
+        .nameplate h1 {
+            font-family: var(--serif);
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--fg-bright);
+            letter-spacing: 0.01em;
+            line-height: 1.1;
+            padding: 14px 0;
+        }
+        .nameplate h1 a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .nameplate-sub {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--fg-dim);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding-bottom: 10px;
+        }
+
+        /* --- Dateline bar --- */
+        .dateline-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--fg-dim);
+            letter-spacing: 0.03em;
+        }
+        .dateline-bar a {
+            color: var(--fg-dim);
+            text-decoration: none;
+        }
+        .dateline-bar a:hover {
+            color: var(--accent);
+        }
+
+        /* --- Nav (inside dateline for broadsheet) --- */
+        .nav-inline {
+            display: flex;
+            gap: 16px;
+        }
+        .nav-inline a {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 400;
+            color: var(--fg-dim);
+            text-decoration: none;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            transition: color 0.15s;
+        }
+        .nav-inline a:hover, .nav-inline a.active {
+            color: var(--accent);
+        }
+
+        /* --- Prose header (for inner pages) --- */
+        header.prose-header {
+            border-bottom: 1px solid var(--border);
+            padding: 28px 0 20px;
+        }
+        .prose-masthead {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px 24px;
+        }
+        .prose-masthead h1 {
+            font-family: var(--mono);
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--fg-bright);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .prose-masthead h1 a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* --- Section rules --- */
+        .rule { border: none; border-top: 1px solid var(--rule); margin: 0; }
+        .rule-double {
+            border: none;
+            border-top: 3px double var(--rule-heavy);
+            margin: 0;
+        }
+        .rule-section {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 20px 0;
+        }
+
+        /* --- Main --- */
+        main {
+            padding: 0 0 64px;
+        }
+
+        /* --- Reason tags --- */
+        .reason-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 400;
+            padding: 1px 5px;
+            border-radius: 2px;
+            letter-spacing: 0.02em;
+            display: inline-block;
+        }
+        .reason-tag.mutual { background: var(--tag-mutual); color: #c8ddc9; }
+        .reason-tag.followed { background: var(--tag-original); color: #c0d0dd; }
+        .reason-tag.original { background: var(--tag-original); color: #c0d0dd; }
+        .reason-tag.source { background: var(--tag-source); color: #ddc8a8; }
+        .reason-tag.link { background: var(--tag-link); color: #c8bedd; }
+        .reason-tag.substance { background: var(--tag-substance); color: #b8cccc; }
+        .reason-tag.penalty { background: var(--tag-penalty); color: #ddb8b8; }
+        .reason-tag.default { background: var(--bg-raised); color: var(--fg-dim); border: 1px solid var(--border); }
+        .lang-badge {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--fg-dim);
+            border: 1px solid var(--border);
+            padding: 0 4px;
+            border-radius: 2px;
+            margin-left: 4px;
+            vertical-align: baseline;
+        }
+
+        /* --- Prose --- */
+        .prose { max-width: 600px; }
+        .prose h2 {
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--fg-bright);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 36px 0 14px;
+        }
+        .prose h2:first-child { margin-top: 0; }
+        .prose p {
+            font-size: 17px;
+            margin-bottom: 14px;
+            color: var(--fg);
+        }
+        .prose ul, .prose ol {
+            margin: 0 0 14px 20px;
+            font-size: 17px;
+        }
+        .prose li { margin-bottom: 6px; }
+        .prose code {
+            font-family: var(--mono);
+            font-size: 14px;
+            background: var(--bg-raised);
+            padding: 1px 5px;
+            border-radius: 2px;
+        }
+        .prose a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid var(--accent-dim);
+            transition: border-color 0.15s;
+        }
+        .prose a:hover { border-bottom-color: var(--accent); }
+        .prose .aside {
+            font-size: 15px;
+            font-style: italic;
+            color: var(--fg-dim);
+            padding-left: 16px;
+            border-left: 2px solid var(--border);
+            margin: 20px 0;
+        }
+
+        /* --- Page titles --- */
+        .page-title {
+            font-family: var(--serif);
+            font-size: 28px;
+            font-weight: 400;
+            color: var(--fg-bright);
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+        .page-subtitle {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--fg-dim);
+            margin-bottom: 32px;
+            letter-spacing: 0.02em;
+        }
+
+        /* --- Feed CTA --- */
+        .feed-cta {
+            display: inline-block;
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--bg);
+            background: var(--accent);
+            padding: 10px 20px;
+            border-radius: 3px;
+            text-decoration: none;
+            letter-spacing: 0.03em;
+            transition: background 0.15s;
+        }
+        .feed-cta:hover { background: var(--fg-bright); }
+
+        /* --- Footer --- */
+        footer {
+            border-top: 2px solid var(--rule-heavy);
+            padding: 16px 0 40px;
+        }
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px 24px;
+        }
+        .footer-inner span,
+        .footer-inner a {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--fg-dim);
+            text-decoration: none;
+        }
+        .footer-inner a:hover { color: var(--accent); }
+
+        /* --- Empty state --- */
+        .empty-state {
+            text-align: center;
+            padding: 64px 0;
+            color: var(--fg-dim);
+            font-style: italic;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 480px) {
+            .nameplate h1 { font-size: 28px; }
+            .nav-inline { gap: 10px; }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% block layout %}
+    {# Inner pages use this default layout; homepage overrides it entirely #}
+    <header class="prose-header">
+        <div class="wrap">
+            <div class="prose-masthead">
+                <h1><a href="/">Instant Internet News</a></h1>
+                <nav class="nav-inline">
+                    <a href="/" {% if active_page == "home" %}class="active"{% endif %}>Home</a>
+                    <a href="/about" {% if active_page == "about" %}class="active"{% endif %}>About</a>
+                    <a href="/method" {% if active_page == "method" %}class="active"{% endif %}>Method</a>
+                    <a href="/feed" {% if active_page == "feed" %}class="active"{% endif %}>Feed</a>
+                    <a href="/desk" {% if active_page == "desk" %}class="active"{% endif %}>Desk</a>
+                    <a href="/watch" {% if active_page == "watch" %}class="active"{% endif %}>Watch</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="wrap">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="wrap">
+            <div class="footer-inner">
+                <span>Ranking engine with a point of view</span>
+                <a href="https://bsky.app/profile/instantinternet.news">Bluesky</a>
+            </div>
+        </div>
+    </footer>
+    {% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /method
+Allow: /feed
+Allow: /desk
+Allow: /watch
+Disallow: /xrpc/
+Disallow: /debug/
+Disallow: /.well-known/
+
+Sitemap: https://instantinternet.news/sitemap.xml

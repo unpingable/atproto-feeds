@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% set active_page = "method" %}
+
+{% block title %}Method — Instant Internet News{% endblock %}
+
+{% block content %}
+<div class="prose">
+    <h1 class="page-title">Method</h1>
+    <p class="page-subtitle">How the ranking works. No black box.</p>
+
+    <h2>Candidate Pool</h2>
+    <p>
+        Posts enter the candidate pool from two paths:
+    </p>
+    <ul>
+        <li><strong>Seed graph</strong> &mdash; authors followed by or mutual with the trust source account.
+            Follows, mutuals, and followers each carry different weight.</li>
+        <li><strong>Domain exceptions</strong> &mdash; posts linking to recognized primary-source domains
+            (government, legal, academic, technical) can enter even if the author is outside the graph.</li>
+    </ul>
+    <p>
+        Everything else is ignored at the firehose level. The feed does not attempt
+        to process the entire network.
+    </p>
+
+    <h2>Scoring Components</h2>
+    <p>Each candidate is scored by summing five components:</p>
+
+    <ul>
+        <li><strong>Graph affinity</strong> &mdash; mutual (+4), followed (+2), trusted list (+3), follower (+1).
+            This is the primary anti-garbage prior.</li>
+        <li><strong>Originality</strong> &mdash; original top-level post (+3), repost (-6), quote-post (-1),
+            substantive reply (+0.5), short reply (-1).</li>
+        <li><strong>Evidence</strong> &mdash; external link (+2), primary-source domain (+2 to +3.5),
+            reporting domain (+1 to +2).</li>
+        <li><strong>Substance</strong> &mdash; text in a reasonable length band, multiple links or facets,
+            structured content. Capped, not linear.</li>
+        <li><strong>Freshness</strong> &mdash; exponential decay with a ~12 hour half-life.
+            Recent posts score higher, but not aggressively.</li>
+    </ul>
+
+    <h2>Penalties and Dampening</h2>
+    <ul>
+        <li><strong>Flood control</strong> &mdash; more than 10 posts/day from the same author
+            triggers a ramping penalty, capped at -5.</li>
+        <li><strong>Volume dampener</strong> &mdash; separate from flood control, prolific authors
+            face diminishing returns. At 20 posts/day, their score is multiplied by 0.7.
+            At 40 posts/day, 0.5. Their posts need to be proportionally better to compete.</li>
+        <li><strong>Repost</strong> &mdash; hard -6. Reposts are noise in this context.</li>
+        <li><strong>Author weights</strong> &mdash; a small number of specific authors have manual
+            score multipliers applied. These are editorial overrides for known edge cases
+            where the general rules aren't enough. An author at 0.25 weight needs to post
+            something 4x better than baseline to rank. This is taste, not algorithm, and
+            it's acknowledged rather than hidden.</li>
+    </ul>
+
+    <h2>Composition Rules</h2>
+    <p>
+        After scoring, the ranked list is filtered through composition rules
+        to prevent monotony:
+    </p>
+    <ul>
+        <li>Maximum 2 posts per author per page</li>
+        <li>Maximum 3 posts per root thread</li>
+        <li>Duplicate links collapsed to the top 2</li>
+    </ul>
+    <p>
+        Without these, the feed tends to become one person having a day,
+        or one argument from nineteen angles.
+    </p>
+
+    <h2>Domain Bonuses</h2>
+    <p>
+        A curated set of domains receives scoring bonuses. The list is
+        deliberately transparent:
+    </p>
+    <ul>
+        <li><strong>Primary sources</strong> (+2.0 to +3.5): courtlistener.com, supremecourt.gov,
+            congress.gov, sec.gov, arxiv.org, pubmed, github.com, and similar.</li>
+        <li><strong>Reporting outlets</strong> (+1.0 to +2.0): reuters.com, apnews.com,
+            propublica.org, 404media.co, and similar.</li>
+    </ul>
+    <p>
+        This list has a point of view. It favors primary sources over commentary.
+        It is editable and will evolve.
+    </p>
+
+    <h2>Visibility Policy</h2>
+    <p>
+        The public site only shows posts that are visible to logged-out viewers.
+        Authors who have opted out of unauthenticated visibility via Bluesky's
+        <code>!no-unauthenticated</code> label are silently excluded from the
+        public edition. The feed itself (inside Bluesky) may include posts that
+        signed-in users can see.
+    </p>
+    <p>
+        This means the site edition and the feed are not always identical.
+        That's intentional: one is a public page, the other operates inside
+        a signed-in context.
+    </p>
+
+    <h2>Known Biases</h2>
+    <ul>
+        <li>English-language bias: the trust graph and domain list are English-centric</li>
+        <li>Graph bias: mutuals and follows get a structural advantage. This is intentional but not invisible</li>
+        <li>Domain list bias: the bonus domains reflect one person's judgment about what constitutes a primary source</li>
+        <li>Editorial overrides: a small number of authors have manual weight adjustments. This is acknowledged, not hidden</li>
+        <li>Recency bias: the feed only considers the last 24 hours</li>
+    </ul>
+
+    <h2>Exclusions</h2>
+    <p>
+        Authors can request project-level exclusion by DMing
+        <a href="https://bsky.app/profile/instantinternet.news">@instantinternet.news</a>.
+        Excluded DIDs are dropped from ranking candidates entirely &mdash; they do not
+        appear in the feed, the site, or any future archives. This is separate from
+        Bluesky's <code>!no-unauthenticated</code> label, which only affects logged-out
+        visibility.
+    </p>
+
+    <h2>Update Cadence</h2>
+    <ul>
+        <li>Posts ingested continuously via Bluesky Jetstream</li>
+        <li>Ranking rebuilt every 2 minutes</li>
+        <li>Site editions frozen every 15 minutes</li>
+        <li>Stale posts purged after 48 hours</li>
+    </ul>
+</div>
+{% endblock %}

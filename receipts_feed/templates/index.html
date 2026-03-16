@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+{% set active_page = "home" %}
+
+{% block title %}Instant Internet News{% endblock %}
+
+{% block head %}
+<style>
+    /* --- Broadsheet homepage --- */
+    .front-page { padding: 0 0 40px; }
+
+    /* --- Lead story --- */
+    .lead {
+        padding: 20px 0 16px;
+    }
+    .lead-kicker {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+    .lead-headline {
+        font-family: var(--serif);
+        font-size: 28px;
+        font-weight: 600;
+        color: var(--fg-bright);
+        line-height: 1.25;
+        margin-bottom: 8px;
+    }
+    .lead-headline a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .lead-headline a:hover {
+        color: var(--accent);
+    }
+    .lead-excerpt {
+        font-family: var(--serif);
+        font-size: 17px;
+        color: var(--fg);
+        line-height: 1.55;
+        margin-bottom: 10px;
+    }
+    .lead-byline {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+    }
+    .lead-byline a {
+        color: var(--fg-dim);
+        text-decoration: none;
+    }
+    .lead-byline a:hover { color: var(--accent); }
+    .lead-reasons {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+
+    /* --- Broadsheet grid --- */
+    .broadsheet {
+        display: grid;
+        grid-template-columns: 1fr 1px 1fr 1px 1fr;
+        gap: 0;
+        padding-top: 16px;
+    }
+    .col-rule {
+        background: var(--rule);
+        width: 1px;
+    }
+    .broadsheet-col {
+        padding: 0 18px;
+    }
+    .broadsheet-col:first-child { padding-left: 0; }
+    .broadsheet-col:last-child { padding-right: 0; }
+
+    /* --- Column section headers --- */
+    .col-header {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    /* --- Column items --- */
+    .col-item {
+        margin-bottom: 18px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+    .col-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    .col-item-headline {
+        font-family: var(--serif);
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--fg-bright);
+        line-height: 1.3;
+        margin-bottom: 4px;
+    }
+    .col-item-headline a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .col-item-headline a:hover { color: var(--accent); }
+    .col-item-excerpt {
+        font-family: var(--serif);
+        font-size: 14px;
+        color: var(--fg);
+        line-height: 1.5;
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .col-item-meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-dim);
+    }
+    .col-item-meta a {
+        color: var(--fg-dim);
+        text-decoration: none;
+    }
+    .col-item-meta a:hover { color: var(--accent); }
+    .col-item-domain {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 1px 5px;
+        border: 1px solid var(--border-accent);
+        color: var(--accent);
+        border-radius: 2px;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 4px;
+    }
+    .col-item-domain:hover { border-color: var(--accent); }
+    .col-item-reasons {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+    }
+
+    /* --- Below the fold --- */
+    .below-fold {
+        padding-top: 6px;
+    }
+    .fold-label {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--fg-dim);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        text-align: center;
+        padding: 6px 0;
+    }
+    .wire-grid {
+        display: grid;
+        grid-template-columns: 1fr 1px 1fr;
+        gap: 0;
+        padding-top: 12px;
+    }
+    .wire-col {
+        padding: 0 18px;
+    }
+    .wire-col:first-child { padding-left: 0; }
+    .wire-col:last-child { padding-right: 0; }
+
+    /* --- Sidebar stats (in 3rd column) --- */
+    .sidebar-block {
+        margin-bottom: 20px;
+    }
+    .sidebar-title {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+    }
+    .sidebar-stat {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+        margin-bottom: 4px;
+    }
+    .sidebar-stat strong {
+        color: var(--fg);
+        font-weight: 500;
+    }
+    .sidebar-domain-row {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+        padding: 3px 0;
+        border-bottom: 1px dotted var(--border);
+    }
+    .sidebar-domain-row:last-child { border-bottom: none; }
+    .sidebar-domain-count {
+        color: var(--fg);
+        font-weight: 500;
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 800px) {
+        .broadsheet {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+        .col-rule { display: none; }
+        .broadsheet-col { padding: 0; margin-bottom: 20px; }
+        .wire-grid {
+            grid-template-columns: 1fr;
+        }
+        .wire-col { padding: 0; }
+        .lead-headline { font-size: 22px; }
+    }
+</style>
+{% endblock %}
+
+{# Override the entire layout block to use broadsheet structure #}
+{% block layout %}
+<div class="front-page">
+    <div class="wrap-wide">
+
+        {# --- Nameplate --- #}
+        <div class="nameplate">
+            <hr class="nameplate-rule">
+            <h1><a href="/">Instant Internet News</a></h1>
+            <div class="nameplate-sub">A source-first signal desk</div>
+            <hr class="nameplate-rule-thin">
+        </div>
+
+        {# --- Dateline bar --- #}
+        <div class="dateline-bar">
+            <span>
+                {% if updated_at %}Updated {{ relative_time(updated_at) }}{% endif %}
+                {% if stats.total %} / {{ stats.total }} items{% endif %}
+            </span>
+            <nav class="nav-inline">
+                <a href="/" class="active">Home</a>
+                <a href="/about">About</a>
+                <a href="/method">Method</a>
+                <a href="/feed">Feed</a>
+                <a href="/desk">Desk</a>
+                <a href="/watch">Watch</a>
+            </nav>
+        </div>
+        <hr class="nameplate-rule">
+
+        {% if hero or posts %}
+
+        {# --- Lead story: hero-eligible post --- #}
+        {% set lead = hero %}
+        {% if lead %}
+        <article class="lead">
+            {% set lead_kicker_parts = [] %}
+            {% for r in lead.reasons %}
+                {% if r in ("mutual",) %}{% set _ = lead_kicker_parts.append("mutual") %}
+                {% elif r in ("followed", "follower") %}{% set _ = lead_kicker_parts.append(r) %}
+                {% elif r.startswith("domain:") %}{% set _ = lead_kicker_parts.append(r.split(":")[1]) %}
+                {% elif r == "original" %}{% set _ = lead_kicker_parts.append("original post") %}
+                {% endif %}
+            {% endfor %}
+            <div class="lead-kicker">{{ lead_kicker_parts | join(" / ") or "top ranked" }}</div>
+            <h2 class="lead-headline">
+                <a href="{{ lead.web_url }}">
+                    {%- if lead.display_headline %}{{ lead.display_headline[:120] }}{% if lead.display_headline|length > 120 %}...{% endif %}
+                    {%- elif lead.text %}{{ lead.text[:120] }}{% if lead.text|length > 120 %}...{% endif %}
+                    {%- else %}View post{% endif -%}
+                </a>
+            </h2>
+            {% if lead.text and lead.display_headline != lead.text %}
+            <p class="lead-excerpt">{{ lead.text[:280] }}{% if lead.text|length > 280 %}...{% endif %}</p>
+            {% elif lead.text|length > 120 %}
+            <p class="lead-excerpt">{{ lead.text[120:400] }}{% if lead.text|length > 400 %}...{% endif %}</p>
+            {% endif %}
+            <div class="lead-byline">
+                <a href="https://bsky.app/profile/{{ lead.author_handle }}">@{{ lead.author_handle }}</a>
+                &middot; {{ relative_time(lead.created_at) }}
+                {% if lead.external_uri %}
+                &middot; <a class="col-item-domain" href="{{ lead.external_uri }}" target="_blank" rel="noopener">{{ lead.external_uri | replace("https://", "") | replace("http://", "") | truncate(50, True, "...") }}</a>
+                {% endif %}
+            </div>
+            <div class="lead-reasons">
+                {% for reason in lead.reasons %}
+                    {% if reason in ("mutual",) %}
+                        <span class="reason-tag mutual">{{ reason }}</span>
+                    {% elif reason in ("followed", "follower", "trusted_list") %}
+                        <span class="reason-tag followed">{{ reason }}</span>
+                    {% elif reason == "original" %}
+                        <span class="reason-tag original">original</span>
+                    {% elif reason.startswith("domain:") %}
+                        <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
+                    {% elif reason == "has_link" %}
+                        <span class="reason-tag link">linked</span>
+                    {% elif reason.startswith("substance") %}
+                        <span class="reason-tag substance">substance</span>
+                    {% elif reason == "unknown_author" %}
+                        <span class="reason-tag default">outsider</span>
+                    {% elif not reason.startswith("stale") and not reason.startswith("flood") and "reply" not in reason %}
+                        <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </article>
+        {% endif %}
+
+        <hr class="rule-double">
+
+        {# --- Cluster posts into columns --- #}
+        {# Col 1: Source-bearing (posts with domain bonuses / external links) #}
+        {# Col 2: Graph signal (mutuals/follows, original posts) #}
+        {# Col 3: Sidebar stats + remaining wire items #}
+        {% set source_posts = [] %}
+        {% set graph_posts = [] %}
+        {% set wire_posts = [] %}
+        {% for item in posts %}
+            {% set dominated_by_source = false %}
+            {% for r in item.reasons %}
+                {% if r.startswith("domain:") %}{% set dominated_by_source = true %}{% endif %}
+            {% endfor %}
+            {% if dominated_by_source or (item.external_uri and source_posts|length < 8) %}
+                {% set _ = source_posts.append(item) %}
+            {% elif graph_posts|length < 8 %}
+                {% set _ = graph_posts.append(item) %}
+            {% else %}
+                {% set _ = wire_posts.append(item) %}
+            {% endif %}
+        {% endfor %}
+
+        {# --- Three-column broadsheet --- #}
+        <div class="broadsheet">
+            {# Column 1: Sources #}
+            <div class="broadsheet-col">
+                <div class="col-header">Sources</div>
+                {% for item in source_posts %}
+                <article class="col-item">
+                    <div class="col-item-headline">
+                        <a href="{{ item.web_url }}">
+                            {{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}
+                        </a>
+                    </div>
+                    {% if item.text and item.display_headline != item.text %}
+                    <div class="col-item-excerpt">{{ item.text[:160] }}</div>
+                    {% endif %}
+                    <div class="col-item-meta">
+                        <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                        {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
+                        &middot; {{ relative_time(item.created_at) }}
+                    </div>
+                    {% if item.external_uri %}
+                    <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
+                        {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
+                    </a>
+                    {% endif %}
+                    <div class="col-item-reasons">
+                        {% for reason in item.reasons %}
+                            {% if reason in ("mutual",) %}
+                                <span class="reason-tag mutual">{{ reason }}</span>
+                            {% elif reason in ("followed", "follower", "trusted_list") %}
+                                <span class="reason-tag followed">{{ reason }}</span>
+                            {% elif reason == "original" %}
+                                <span class="reason-tag original">original</span>
+                            {% elif reason.startswith("domain:") %}
+                                <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
+                            {% elif reason == "has_link" %}
+                                <span class="reason-tag link">linked</span>
+                            {% elif reason.startswith("substance") %}
+                                <span class="reason-tag substance">substance</span>
+                            {% elif reason == "substantive_reply" %}
+                                <span class="reason-tag substance">good reply</span>
+                            {% elif reason == "unknown_author" %}
+                                <span class="reason-tag default">outsider</span>
+                            {% elif not reason.startswith("stale") and not reason.startswith("flood") and "reply" not in reason %}
+                                <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+
+            <div class="col-rule"></div>
+
+            {# Column 2: Graph / Originals #}
+            <div class="broadsheet-col">
+                <div class="col-header">From the Graph</div>
+                {% for item in graph_posts %}
+                <article class="col-item">
+                    <div class="col-item-headline">
+                        <a href="{{ item.web_url }}">{{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}</a>
+                    </div>
+                    {% if item.text|length > 80 %}
+                    <div class="col-item-excerpt">{{ item.text[:160] }}</div>
+                    {% endif %}
+                    <div class="col-item-meta">
+                        <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                        {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
+                        &middot; {{ relative_time(item.created_at) }}
+                    </div>
+                    {% if item.external_uri %}
+                    <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
+                        {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
+                    </a>
+                    {% endif %}
+                    <div class="col-item-reasons">
+                        {% for reason in item.reasons %}
+                            {% if reason in ("mutual",) %}
+                                <span class="reason-tag mutual">{{ reason }}</span>
+                            {% elif reason in ("followed", "follower", "trusted_list") %}
+                                <span class="reason-tag followed">{{ reason }}</span>
+                            {% elif reason == "original" %}
+                                <span class="reason-tag original">original</span>
+                            {% elif reason.startswith("domain:") %}
+                                <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
+                            {% elif reason == "has_link" %}
+                                <span class="reason-tag link">linked</span>
+                            {% elif reason.startswith("substance") %}
+                                <span class="reason-tag substance">substance</span>
+                            {% elif reason == "substantive_reply" %}
+                                <span class="reason-tag substance">good reply</span>
+                            {% elif reason == "unknown_author" %}
+                                <span class="reason-tag default">outsider</span>
+                            {% elif not reason.startswith("stale") and not reason.startswith("flood") and "reply" not in reason %}
+                                <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+
+            <div class="col-rule"></div>
+
+            {# Column 3: Stats sidebar + wire briefs #}
+            <div class="broadsheet-col">
+                <div class="sidebar-block">
+                    <div class="sidebar-title">This Edition</div>
+                    <div class="sidebar-stat"><strong>{{ stats.total }}</strong> posts ranked</div>
+                    <div class="sidebar-stat"><strong>{{ stats.original_pct }}%</strong> original content</div>
+                </div>
+                {% if stats.top_domains %}
+                <div class="sidebar-block">
+                    <div class="sidebar-title">Top Domains</div>
+                    {% for domain, count in stats.top_domains %}
+                    <div class="sidebar-domain-row">
+                        <span>{{ domain }}</span>
+                        <span class="sidebar-domain-count">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if wire_posts %}
+                <div class="sidebar-block">
+                    <div class="sidebar-title">Wire</div>
+                    {% for item in wire_posts[:5] %}
+                    <article class="col-item">
+                        <div class="col-item-headline">
+                            <a href="{{ item.web_url }}">{{ item.text[:70] }}{% if item.text|length > 70 %}...{% endif %}</a>
+                        </div>
+                        <div class="col-item-meta">
+                            <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                            &middot; {{ relative_time(item.created_at) }}
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# --- Below the fold --- #}
+        {% if wire_posts|length > 6 %}
+        <div class="below-fold">
+            <hr class="rule">
+            <div class="fold-label">Below the Fold</div>
+            <hr class="rule">
+            <div class="wire-grid">
+                <div class="wire-col">
+                    {% for item in wire_posts[6:] %}
+                    {% if loop.index0 % 2 == 0 %}
+                    <article class="col-item">
+                        <div class="col-item-headline">
+                            <a href="{{ item.web_url }}">{{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}</a>
+                        </div>
+                        <div class="col-item-meta">
+                            <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                            &middot; {{ relative_time(item.created_at) }}
+                        </div>
+                    </article>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="col-rule"></div>
+                <div class="wire-col">
+                    {% for item in wire_posts[6:] %}
+                    {% if loop.index0 % 2 == 1 %}
+                    <article class="col-item">
+                        <div class="col-item-headline">
+                            <a href="{{ item.web_url }}">{{ (item.display_headline or item.text)[:80] }}{% if (item.display_headline or item.text)|length > 80 %}...{% endif %}</a>
+                        </div>
+                        <div class="col-item-meta">
+                            <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                            &middot; {{ relative_time(item.created_at) }}
+                        </div>
+                    </article>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <p>No ranked posts yet. The engine is warming up.</p>
+        </div>
+        {% endif %}
+
+    </div>{# /wrap-wide #}
+
+    <footer>
+        <div class="wrap-wide">
+            <div class="footer-inner">
+                <span>Ranking engine with a point of view</span>
+                <a href="https://bsky.app/profile/instantinternet.news">Bluesky</a>
+            </div>
+        </div>
+    </footer>
+</div>
+{% endblock %}

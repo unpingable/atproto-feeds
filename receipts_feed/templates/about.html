@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active_page = "about" %}
+
+{% block title %}About — Instant Internet News{% endblock %}
+
+{% block content %}
+<div class="prose">
+    <h1 class="page-title">About</h1>
+    <p class="page-subtitle">What this is, what it rewards, what it does not claim to know.</p>
+
+    <h2>What This Is</h2>
+    <p>
+        Instant Internet News is a custom Bluesky feed and public signal desk.
+        It runs a ranking algorithm called <strong>Receipts</strong> that surfaces
+        posts where people show their work: original writing, primary sources,
+        linked evidence, substantive replies.
+    </p>
+    <p>
+        The site you're reading is a read-only view of the same ranking output
+        that powers the Bluesky feed. One engine, two faces.
+    </p>
+
+    <h2>What It Rewards</h2>
+    <ul>
+        <li>Original posts over repost sludge</li>
+        <li>Links to primary sources: court documents, government filings, research papers, code</li>
+        <li>Posts from trusted graph neighbors: mutuals, follows, curated lists</li>
+        <li>Substantive replies that add context</li>
+        <li>Recognized reporting outlets</li>
+    </ul>
+
+    <h2>What It Penalizes</h2>
+    <ul>
+        <li>Reposts</li>
+        <li>Screenshot discourse with no source link</li>
+        <li>Floodposting: more than ten posts a day starts costing you</li>
+        <li>Low-effort quote-dunks</li>
+        <li>Short drive-by replies</li>
+    </ul>
+
+    <h2>What It Does Not Claim</h2>
+    <ul>
+        <li>It does not verify factual truth</li>
+        <li>It does not do sentiment analysis or stance detection</li>
+        <li>It does not claim to be neutral. It has a point of view: substance over noise</li>
+        <li>It does not try to be comprehensive. It is deliberately narrow</li>
+        <li>It does not use engagement metrics as a primary signal</li>
+    </ul>
+
+    <p class="aside">
+        This is a ranking instrument, not an oracle. It admits it has taste
+        instead of pretending to be weather.
+    </p>
+
+    <h2>Rendering Policy</h2>
+    <p>
+        Posts on this site are rendered natively with links to the original
+        Bluesky post. If an author has disabled logged-out visibility, or has
+        deleted their post, the item is omitted from the public edition.
+        We do not mirror, screenshot, or cache post content.
+    </p>
+    <p>
+        This is curation, not extraction.
+    </p>
+
+    <h2>Opt Out</h2>
+    <p>
+        Want your posts excluded from this project? DM
+        <a href="https://bsky.app/profile/instantinternet.news">@instantinternet.news</a>
+        with "opt out" and your account will be removed from the feed, site,
+        and any future archives. DM "opt in" to reverse it.
+    </p>
+    <p>
+        This is a project-level exclusion, separate from Bluesky's own
+        visibility settings. It applies to your DID across all surfaces
+        this project operates.
+    </p>
+</div>
+{% endblock %}

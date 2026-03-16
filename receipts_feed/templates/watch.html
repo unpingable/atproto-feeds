@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% set active_page = "watch" %}
+
+{% block title %}Watch — Instant Internet News{% endblock %}
+
+{% block head %}
+<style>
+    .watch-intro {
+        max-width: 600px;
+        margin-bottom: 24px;
+    }
+    .watch-intro p {
+        font-family: var(--serif);
+        font-size: 16px;
+        color: var(--fg);
+        line-height: 1.55;
+        margin-bottom: 10px;
+    }
+    .watch-note {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+        font-style: italic;
+        margin-bottom: 24px;
+    }
+
+    .watch-author {
+        margin-bottom: 32px;
+    }
+    .watch-author-header {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding-bottom: 8px;
+        margin-bottom: 14px;
+        border-bottom: 2px solid var(--rule-heavy);
+    }
+    .watch-author-name {
+        font-family: var(--serif);
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--fg-bright);
+    }
+    .watch-author-name a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .watch-author-name a:hover { color: var(--accent); }
+    .watch-author-handle {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+    }
+
+    .watch-posts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 32px;
+    }
+    .watch-post {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .watch-post:last-child { border-bottom: none; }
+    .watch-post-headline {
+        font-family: var(--serif);
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--fg-bright);
+        line-height: 1.35;
+        margin-bottom: 4px;
+    }
+    .watch-post-headline a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .watch-post-headline a:hover { color: var(--accent); }
+    .watch-post-meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-dim);
+    }
+    .watch-post-domain {
+        display: inline-block;
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 1px 5px;
+        border: 1px solid var(--border-accent);
+        color: var(--accent);
+        border-radius: 2px;
+        text-decoration: none;
+    }
+    .watch-post-domain:hover { border-color: var(--accent); }
+
+    @media (max-width: 600px) {
+        .watch-posts { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Watch</h1>
+<p class="page-subtitle">People I don't want to miss.</p>
+
+<div class="watch-intro">
+    <p>
+        A personal watchlist. These authors are surfaced here because of
+        miss risk, not because the ranking engine promoted them. Their posts
+        do not receive any boost in the main edition.
+    </p>
+</div>
+<div class="watch-note">
+    Separate lens, same substrate.
+</div>
+
+<hr class="rule">
+
+{% if authors %}
+{% for author in authors %}
+<div class="watch-author">
+    <div class="watch-author-header">
+        <span class="watch-author-name">
+            <a href="https://bsky.app/profile/{{ author.handle }}">{{ author.display_name }}</a>
+        </span>
+        <span class="watch-author-handle">@{{ author.handle }}</span>
+    </div>
+    <div class="watch-posts">
+        {% for item in author.posts %}
+        <article class="watch-post">
+            <div class="watch-post-headline">
+                <a href="{{ item.web_url }}">
+                    {{ item.display_headline[:100] }}{% if item.display_headline|length > 100 %}...{% endif %}
+                </a>
+            </div>
+            <div class="watch-post-meta">
+                {{ relative_time(item.created_at) }}
+                {% if item.like_count %}&middot; {{ item.like_count }} likes{% endif %}
+            </div>
+            {% if item.external_uri %}
+            <a class="watch-post-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
+                {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(45, True, "...") }}
+            </a>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+    <p>No watchlist configured yet.</p>
+</div>
+{% endif %}
+{% endblock %}

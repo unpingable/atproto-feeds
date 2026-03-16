@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% set active_page = "feed" %}
+
+{% block title %}Receipts Feed — Instant Internet News{% endblock %}
+
+{% block content %}
+<div class="prose">
+    <h1 class="page-title">Receipts</h1>
+    <p class="page-subtitle">A custom Bluesky feed. Add it to your tabs.</p>
+
+    <p>
+        <strong>Receipts</strong> is a Bluesky custom feed that ranks for
+        originality, primary sources, and graph proximity. Less repost fog.
+        More people showing their work.
+    </p>
+
+    <p>
+        <a class="feed-cta" href="https://bsky.app/profile/instantinternet.news/feed/receipts">
+            Open in Bluesky
+        </a>
+    </p>
+
+    <h2>What You Get</h2>
+    <ul>
+        <li>Original posts from your extended trust graph</li>
+        <li>Source-bearing posts that break in by domain quality</li>
+        <li>Substantive replies with context</li>
+        <li>No reposts, no screenshot discourse, no floodposting</li>
+    </ul>
+
+    <h2>Current Sample</h2>
+</div>
+
+{% if posts %}
+    {% for item in posts %}
+    <article class="post-item">
+        <div class="post-meta">
+            <span class="post-author">@{{ item.author_handle }}</span>
+            <span class="post-time">{{ relative_time(item.created_at) }}</span>
+        </div>
+        <div class="post-embed">
+            <blockquote class="bluesky-embed" data-bluesky-uri="{{ item.uri }}" data-bluesky-embed-color-scheme="dark">
+                <p>{{ item.text[:200] }}{% if item.text|length > 200 %}...{% endif %}</p>
+                &mdash; {{ item.author_display_name }}
+                (<a href="{{ item.web_url }}">view on Bluesky</a>)
+            </blockquote>
+        </div>
+        <div class="post-reasons">
+            {% for reason in item.reasons %}
+                {% if reason in ("mutual",) %}
+                    <span class="reason-tag mutual">{{ reason }}</span>
+                {% elif reason == "original" %}
+                    <span class="reason-tag original">original</span>
+                {% elif reason.startswith("domain:") %}
+                    <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
+                {% elif reason == "has_link" %}
+                    <span class="reason-tag link">linked</span>
+                {% elif not reason.startswith("stale") %}
+                    <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </article>
+    {% endfor %}
+{% else %}
+<div class="empty-state">
+    <p>The engine is warming up. Check back shortly.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script async src="https://embed.bsky.app/static/embed.js" charset="utf-8"></script>
+{% endblock %}
