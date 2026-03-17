@@ -45,21 +45,7 @@
                 (<a href="{{ item.web_url }}">view on Bluesky</a>)
             </blockquote>
         </div>
-        <div class="post-reasons">
-            {% for reason in item.reasons %}
-                {% if reason in ("mutual",) %}
-                    <span class="reason-tag mutual">{{ reason }}</span>
-                {% elif reason == "original" %}
-                    <span class="reason-tag original">original</span>
-                {% elif reason.startswith("domain:") %}
-                    <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
-                {% elif reason == "has_link" %}
-                    <span class="reason-tag link">linked</span>
-                {% elif not reason.startswith("stale") %}
-                    <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
-                {% endif %}
-            {% endfor %}
-        </div>
+        <div class="post-reasons">{{ tags(item.reasons) }}</div>
     </article>
     {% endfor %}
 {% else %}

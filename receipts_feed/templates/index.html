@@ -250,7 +250,8 @@
         {# --- Dateline bar --- #}
         <div class="dateline-bar">
             <span>
-                {% if updated_at %}Updated {{ relative_time(updated_at) }}{% endif %}
+                {% if stats.edition_num %}Edition {{ "%04d"|format(stats.edition_num) }} /{% endif %}
+                {% if updated_at %}{{ relative_time(updated_at) }}{% endif %}
                 {% if stats.total %} / {{ stats.total }} items{% endif %}
             </span>
             <nav class="nav-inline">
@@ -270,15 +271,7 @@
         {% set lead = hero %}
         {% if lead %}
         <article class="lead">
-            {% set lead_kicker_parts = [] %}
-            {% for r in lead.reasons %}
-                {% if r in ("mutual",) %}{% set _ = lead_kicker_parts.append("mutual") %}
-                {% elif r in ("followed", "follower") %}{% set _ = lead_kicker_parts.append(r) %}
-                {% elif r.startswith("domain:") %}{% set _ = lead_kicker_parts.append(r.split(":")[1]) %}
-                {% elif r == "original" %}{% set _ = lead_kicker_parts.append("original post") %}
-                {% endif %}
-            {% endfor %}
-            <div class="lead-kicker">{{ lead_kicker_parts | join(" / ") or "top ranked" }}</div>
+            <div class="lead-kicker">{{ tags(lead.reasons, 3) }}</div>
             <h2 class="lead-headline">
                 <a href="{{ lead.web_url }}">
                     {%- if lead.display_headline %}{{ trunc(lead.display_headline, 140) }}
@@ -298,27 +291,7 @@
                 &middot; <a class="col-item-domain" href="{{ lead.external_uri }}" target="_blank" rel="noopener">{{ lead.external_uri | replace("https://", "") | replace("http://", "") | truncate(50, True, "...") }}</a>
                 {% endif %}
             </div>
-            <div class="lead-reasons">
-                {% for reason in lead.reasons %}
-                    {% if reason in ("mutual",) %}
-                        <span class="reason-tag mutual">{{ reason }}</span>
-                    {% elif reason in ("followed", "follower", "trusted_list") %}
-                        <span class="reason-tag followed">{{ reason }}</span>
-                    {% elif reason == "original" %}
-                        <span class="reason-tag original">original</span>
-                    {% elif reason.startswith("domain:") %}
-                        <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
-                    {% elif reason == "has_link" %}
-                        <span class="reason-tag link">linked</span>
-                    {% elif reason.startswith("substance") %}
-                        <span class="reason-tag substance">substance</span>
-                    {% elif reason == "unknown_author" %}
-                        <span class="reason-tag default">outsider</span>
-                    {% elif not reason.startswith("stale") and not reason.startswith("flood") and "reply" not in reason %}
-                        <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
-                    {% endif %}
-                {% endfor %}
-            </div>
+            <div class="lead-reasons">{{ tags(lead.reasons) }}</div>
         </article>
         {% endif %}
 
@@ -370,29 +343,7 @@
                         {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
                     </a>
                     {% endif %}
-                    <div class="col-item-reasons">
-                        {% for reason in item.reasons %}
-                            {% if reason in ("mutual",) %}
-                                <span class="reason-tag mutual">{{ reason }}</span>
-                            {% elif reason in ("followed", "follower", "trusted_list") %}
-                                <span class="reason-tag followed">{{ reason }}</span>
-                            {% elif reason == "original" %}
-                                <span class="reason-tag original">original</span>
-                            {% elif reason.startswith("domain:") %}
-                                <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
-                            {% elif reason == "has_link" %}
-                                <span class="reason-tag link">linked</span>
-                            {% elif reason.startswith("substance") %}
-                                <span class="reason-tag substance">substance</span>
-                            {% elif reason == "substantive_reply" %}
-                                <span class="reason-tag substance">good reply</span>
-                            {% elif reason == "unknown_author" %}
-                                <span class="reason-tag default">outsider</span>
-                            {% elif not reason.startswith("stale") and not reason.startswith("flood") and "reply" not in reason %}
-                                <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
+                    <div class="col-item-reasons">{{ tags(item.reasons) }}</div>
                 </article>
                 {% endfor %}
             </div>
@@ -420,29 +371,7 @@
                         {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
                     </a>
                     {% endif %}
-                    <div class="col-item-reasons">
-                        {% for reason in item.reasons %}
-                            {% if reason in ("mutual",) %}
-                                <span class="reason-tag mutual">{{ reason }}</span>
-                            {% elif reason in ("followed", "follower", "trusted_list") %}
-                                <span class="reason-tag followed">{{ reason }}</span>
-                            {% elif reason == "original" %}
-                                <span class="reason-tag original">original</span>
-                            {% elif reason.startswith("domain:") %}
-                                <span class="reason-tag source">{{ reason.split(":")[1] }}</span>
-                            {% elif reason == "has_link" %}
-                                <span class="reason-tag link">linked</span>
-                            {% elif reason.startswith("substance") %}
-                                <span class="reason-tag substance">substance</span>
-                            {% elif reason == "substantive_reply" %}
-                                <span class="reason-tag substance">good reply</span>
-                            {% elif reason == "unknown_author" %}
-                                <span class="reason-tag default">outsider</span>
-                            {% elif not reason.startswith("stale") and not reason.startswith("flood") and "reply" not in reason %}
-                                <span class="reason-tag default">{{ reason.split(":")[0] }}</span>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
+                    <div class="col-item-reasons">{{ tags(item.reasons) }}</div>
                 </article>
                 {% endfor %}
             </div>
@@ -474,12 +403,19 @@
                     {% for item in wire_posts[:5] %}
                     <article class="col-item">
                         <div class="col-item-headline">
-                            <a href="{{ item.web_url }}">{{ trunc(item.text, 75) }}</a>
+                            <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 75) }}</a>
                         </div>
                         <div class="col-item-meta">
                             <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                            {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                             &middot; {{ relative_time(item.created_at) }}
                         </div>
+                        {% if item.external_uri %}
+                        <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
+                            {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(35, True, "...") }}
+                        </a>
+                        {% endif %}
+                        <div class="col-item-reasons" style="margin-top:4px;">{{ tags(item.reasons, 3) }}</div>
                     </article>
                     {% endfor %}
                 </div>

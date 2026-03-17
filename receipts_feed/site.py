@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from . import config, db, timeutil
 from .domains import is_platform_domain
 from .hydrate import hydrate_posts, at_uri_to_web_url
+from .tags import render_tags_html
 from .watchlist import WATCHLIST
 
 LOG = logging.getLogger("receipts.site")
@@ -155,8 +156,15 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
         "top_domains": domains.most_common(5),
     }
 
+    # Compute edition number (sequential)
+    conn = db.get_conn()
+    row = conn.execute("SELECT COUNT(*) FROM editions WHERE feed_name = 'receipts'").fetchone()
+    conn.close()
+    edition_num = (row[0] if row else 0) + 1
+    stats["edition_num"] = edition_num
+
     edition_id = db.save_edition("receipts", items, stats, hero_idx)
-    LOG.info("froze edition %s: %d items, hero=%d", edition_id, len(items), hero_idx)
+    LOG.info("froze edition #%d (%s): %d items, hero=%d", edition_num, edition_id, len(items), hero_idx)
     return edition_id
 
 
@@ -299,6 +307,7 @@ async def homepage(request: Request):
         "updated_at": edition.get("created_at"),
         "relative_time": _relative_time,
         "trunc": _truncate_word,
+        "tags": render_tags_html,
     })
 
 
@@ -322,6 +331,8 @@ async def feed_landing(request: Request):
         "stats": edition.get("stats", {}),
         "updated_at": edition.get("created_at"),
         "relative_time": _relative_time,
+        "trunc": _truncate_word,
+        "tags": render_tags_html,
     })
 
 
