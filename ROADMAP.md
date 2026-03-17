@@ -82,6 +82,21 @@ Dry, functional: `emerging`, `active`, `persistent`, `fading`,
 Tiny box: new / rising / fading / gone. Makes the 15-minute cadence
 legible.
 
+### BUSINESS page
+
+Filtered lens over the same engine for institutional/business-system stories.
+Not generic finance news — business as infrastructure and conflict:
+software wars, workflow captivity, pricing power, labor fights, market
+structure, AI replacement theater, vendor/compliance/data moats.
+
+Bias toward: reporting/primary source links, enterprise/finance/market
+domains, clusters involving firms/products/regulation/labor.
+
+Possible subsections: Workflow Wars, Moats & Markets, Labor & Management,
+AI Replacement Theater, Policy/Regulation.
+
+Same architecture as DESK/WATCH — separate lens, same substrate.
+
 ### Cluster pages
 
 Click a story → lead post, supporting posts, source links, timeline

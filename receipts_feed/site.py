@@ -68,10 +68,18 @@ def _is_hero_eligible(item: dict) -> bool:
     if not (is_original or has_substance or has_source):
         return False
 
-    # Prefer English or unset for the hero slot
+    # Prefer English for the hero slot
+    # Check both the langs field and the actual text for non-Latin scripts
     langs = item.get("langs", [])
     if langs and "en" not in langs:
         return False
+    # Detect non-Latin dominant text even when langs is unset
+    headline_text = item.get("display_headline", "") or item.get("text", "")
+    if headline_text:
+        latin_chars = sum(1 for c in headline_text if c.isascii() and c.isalpha())
+        total_alpha = sum(1 for c in headline_text if c.isalpha())
+        if total_alpha > 10 and latin_chars < total_alpha * 0.5:
+            return False
 
     return True
 

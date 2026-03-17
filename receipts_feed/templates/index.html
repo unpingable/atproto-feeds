@@ -304,26 +304,35 @@
         <hr class="rule-double">
 
         {# --- Cluster posts into columns --- #}
-        {# Col 1: Source-bearing (posts with domain bonuses / external links) #}
-        {# Col 2: Graph signal (mutuals/follows, original posts) #}
-        {# Col 3: Sidebar stats + remaining wire items #}
+        {# Col 1: Sources — URL clusters, domain bonuses, outsider break-ins with links #}
+        {# Col 2: From the Graph — graph-native posts (mutual/followed/follower), no outsiders #}
+        {# Col 3: Sidebar stats + wire items #}
         {% set source_posts = [] %}
         {% set graph_posts = [] %}
         {% set wire_posts = [] %}
         {% for item in posts %}
             {% set is_url_cluster = item.cluster_type == "url" if item.cluster_type is defined else false %}
-            {% set dominated_by_source = false %}
+            {% set is_outsider = "unknown_author" in item.reasons %}
+            {% set is_graph = false %}
             {% for r in item.reasons %}
-                {% if r.startswith("domain:") %}{% set dominated_by_source = true %}{% endif %}
+                {% if r in ("mutual", "followed", "follower", "trusted_list") %}{% set is_graph = true %}{% endif %}
             {% endfor %}
-            {% if is_url_cluster or dominated_by_source or (item.external_uri and source_posts|length < 8) %}
+            {% set has_source_domain = false %}
+            {% for r in item.reasons %}
+                {% if r.startswith("domain:") %}{% set has_source_domain = true %}{% endif %}
+            {% endfor %}
+
+            {# Sources: URL clusters, outsider break-ins, domain-bonus posts, linked outsiders #}
+            {% if is_url_cluster or has_source_domain or (is_outsider and item.external_uri) %}
                 {% if source_posts|length < 8 %}
                     {% set _ = source_posts.append(item) %}
                 {% else %}
                     {% set _ = wire_posts.append(item) %}
                 {% endif %}
-            {% elif graph_posts|length < 8 %}
+            {# Graph: only actual graph members (mutual/followed/follower) #}
+            {% elif is_graph and graph_posts|length < 8 %}
                 {% set _ = graph_posts.append(item) %}
+            {# Everything else: wire #}
             {% else %}
                 {% set _ = wire_posts.append(item) %}
             {% endif %}
@@ -348,7 +357,7 @@
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
                         {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                         &middot; {{ relative_time(item.created_at) }}
-                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts{% if item.unique_authors and item.unique_authors > 1 %} / {{ item.unique_authors }} authors{% endif %}</span>{% endif %}
+                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts / {{ item.unique_authors }} authors{% if item.cluster_state == "persistent" %} / persistent{% endif %}</span>{% endif %}
                     </div>
                     {% if item.external_uri %}
                     <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
@@ -377,7 +386,7 @@
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
                         {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                         &middot; {{ relative_time(item.created_at) }}
-                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts{% if item.unique_authors and item.unique_authors > 1 %} / {{ item.unique_authors }} authors{% endif %}</span>{% endif %}
+                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts / {{ item.unique_authors }} authors{% if item.cluster_state == "persistent" %} / persistent{% endif %}</span>{% endif %}
                     </div>
                     {% if item.external_uri %}
                     <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
