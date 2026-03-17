@@ -138,14 +138,15 @@ def hydrate_posts(uris: list[str]) -> dict[str, dict]:
                     # - starts with "- " (platform stub)
                     # - is mostly a URL
                     # - OR when embed title is just a better headline
+                    has_url_in_text = ("http" in text_stripped or "www." in text_stripped
+                                       or ".com/" in text_stripped or ".org/" in text_stripped)
                     use_embed = (
                         len(text_stripped) < 60
-                        or text_stripped.startswith(("- ", '"...', '\u201c...', '...'))
-                        or text_stripped.startswith("http")
-                        or text_stripped.count("http") >= 1 and len(text_stripped) < 120
+                        or text_stripped.startswith(("- ", '"...', '\u201c...', '...', '\u266b', '\u266a'))
+                        or text_stripped.startswith(("http", "www."))
+                        or (has_url_in_text and len(text_stripped) < 140)
                     )
-                    # Always prefer embed title if it's a real article title
-                    # and the post text doesn't contain more substance
+                    # Always prefer embed title if it's a real article/video title
                     if use_embed or len(embed_title) > len(text_stripped):
                         display_headline = embed_title
 

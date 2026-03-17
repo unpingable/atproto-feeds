@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from . import config, db
 from .ingest import JetstreamConsumer
 from .rank import run_rank
+from .dm_listener import check_dms
 from .site import router as site_router, build_and_freeze_edition
 
 LOG = logging.getLogger("receipts.api")
@@ -30,6 +31,9 @@ _consumer: JetstreamConsumer | None = None
 _consumer_task: asyncio.Task | None = None
 _rank_task: asyncio.Task | None = None
 _edition_task: asyncio.Task | None = None
+_dm_task: asyncio.Task | None = None
+
+DM_CHECK_INTERVAL = 300  # 5 minutes
 
 
 async def _periodic_rank():
@@ -41,6 +45,18 @@ async def _periodic_rank():
         except Exception:
             LOG.exception("rank pass failed")
         await asyncio.sleep(config.RANK_INTERVAL_SECONDS)
+
+
+async def _periodic_dm_check():
+    """Background task to check DMs for opt-out/opt-in commands."""
+    loop = asyncio.get_event_loop()
+    await asyncio.sleep(60)  # Wait for startup
+    while True:
+        try:
+            await loop.run_in_executor(None, check_dms)
+        except Exception:
+            LOG.exception("DM check failed")
+        await asyncio.sleep(DM_CHECK_INTERVAL)
 
 
 async def _periodic_edition():
@@ -72,6 +88,9 @@ async def startup():
     _edition_task = asyncio.create_task(_periodic_edition())
     LOG.info("started periodic edition freeze (interval=%ds)", config.EDITION_INTERVAL_SECONDS)
 
+    _dm_task = asyncio.create_task(_periodic_dm_check())
+    LOG.info("started DM listener (interval=%ds)", DM_CHECK_INTERVAL)
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -83,6 +102,8 @@ async def shutdown():
         _rank_task.cancel()
     if _edition_task:
         _edition_task.cancel()
+    if _dm_task:
+        _dm_task.cancel()
 
 
 # -- Feed skeleton endpoint --
