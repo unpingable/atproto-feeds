@@ -10,4 +10,7 @@ WATCHLIST: list[str] = [
     "propublica.org",
     "aelkus.bsky.social",
     "lastnpcalex.agency",
+    "robotson.media",
+    "sevensixfive.bsky.social",
+    "diojeanne.bsky.social",
 ]

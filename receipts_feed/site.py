@@ -14,6 +14,7 @@ from . import config, db, timeutil
 from .domains import is_platform_domain
 from .business import is_business_relevant
 from .cluster import build_clustered_edition, persist_clusters
+from .docket import compact_dockets
 from .hydrate import hydrate_posts, at_uri_to_web_url
 from .tags import render_tags_html
 from .watchlist import WATCHLIST
@@ -156,6 +157,12 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
 
     if not items:
         return None
+
+    # Compact document floods into docket cards
+    try:
+        items = compact_dockets(items)
+    except Exception:
+        LOG.exception("docket compaction failed (non-fatal)")
 
     # Find hero: first hero-eligible item
     hero_idx = 0

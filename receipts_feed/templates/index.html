@@ -158,6 +158,44 @@
         margin-left: 6px;
     }
 
+    /* --- Docket cards --- */
+    .docket-card {
+        background: var(--bg-raised);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent-dim);
+        padding: 12px 14px;
+        margin-bottom: 18px;
+    }
+    .docket-title {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    .docket-subtitle {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--fg-dim);
+        margin-bottom: 10px;
+    }
+    .docket-member {
+        font-family: var(--serif);
+        font-size: 13px;
+        color: var(--fg);
+        line-height: 1.4;
+        padding: 3px 0;
+        border-bottom: 1px dotted var(--border);
+    }
+    .docket-member:last-child { border-bottom: none; }
+    .docket-member a {
+        color: var(--fg);
+        text-decoration: none;
+    }
+    .docket-member a:hover { color: var(--accent); }
+
     /* --- Below the fold --- */
     .below-fold {
         padding-top: 6px;
@@ -315,12 +353,16 @@
         {% set graph_posts = [] %}
         {% set wire_posts = [] %}
         {% for item in posts %}
+            {% set is_docket = item.is_docket if item.is_docket is defined else false %}
             {% set is_url_cluster = item.cluster_type == "url" if item.cluster_type is defined else false %}
             {% set is_outsider = "unknown_author" in item.reasons %}
             {% set is_graph = "mutual" in item.reasons or "followed" in item.reasons or "follower" in item.reasons or "trusted_list" in item.reasons %}
 
+            {# Dockets go to Sources #}
+            {% if is_docket and source_posts|length < 8 %}
+                {% set _ = source_posts.append(item) %}
             {# Graph posts go to From the Graph first, regardless of links/domains #}
-            {% if is_graph and not is_url_cluster and graph_posts|length < 8 %}
+            {% elif is_graph and not is_url_cluster and graph_posts|length < 8 %}
                 {% set _ = graph_posts.append(item) %}
             {# Sources: URL clusters (any origin) + outsider break-ins #}
             {% elif (is_url_cluster or is_outsider) and source_posts|length < 8 %}
@@ -342,6 +384,17 @@
             <div class="broadsheet-col">
                 <div class="col-header">Sources</div>
                 {% for item in source_posts %}
+                {% if item.is_docket is defined and item.is_docket %}
+                <div class="docket-card">
+                    <div class="docket-title">{{ item.docket_title }}</div>
+                    <div class="docket-subtitle">{{ item.docket_subtitle }}</div>
+                    {% for member in item.docket_members %}
+                    <div class="docket-member">
+                        <a href="{{ member.web_url }}">{{ member.headline[:70] }}{% if member.headline|length > 70 %}...{% endif %}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
                 <article class="col-item">
                     <div class="col-item-headline">
                         <a href="{{ item.web_url }}">
@@ -364,6 +417,7 @@
                     {% endif %}
                     <div class="col-item-reasons">{{ tags(item.reasons) }}</div>
                 </article>
+                {% endif %}
                 {% endfor %}
             </div>
 
