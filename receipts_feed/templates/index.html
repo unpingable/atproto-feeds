@@ -572,6 +572,11 @@
                     <div class="docket-card" style="margin-bottom: 12px;">
                         <div class="docket-title">{{ item.docket_title }}</div>
                         <div class="docket-subtitle">{{ item.docket_subtitle }}</div>
+                        {% for member in item.docket_members[:3] %}
+                        <div class="docket-member">
+                            <a href="{{ member.web_url }}">{{ member.headline[:60] }}{% if member.headline|length > 60 %}...{% endif %}</a>
+                        </div>
+                        {% endfor %}
                     </div>
                     {% else %}
                     <article class="col-item">

@@ -82,6 +82,14 @@ Dry, functional: `emerging`, `active`, `persistent`, `fading`,
 Tiny box: new / rising / fading / gone. Makes the 15-minute cadence
 legible.
 
+### German reading page (DE / Lesen)
+
+Filtered lens for German-language posts. Same ranking/anti-sludge rules,
+filter to `langs` containing `de`. Possibly biased toward German reporting
+domains (tagesschau.de, spiegel.de, zeit.de, etc). Could be a hidden
+subpage for personal use or a public section. Useful for language practice
+with curated signal instead of raw firehose chaos.
+
 ### BUSINESS page
 
 Filtered lens over the same engine for institutional/business-system stories.

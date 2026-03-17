@@ -98,8 +98,13 @@ def _is_strong_story(item: dict) -> bool:
     # Strong cluster: multiple posts from multiple authors
     if post_count >= 3 and unique_authors >= 2:
         return True
-    # High individual score suggests graph/substance uptake
-    if item.get("score", 0) > 8:
+    # Graph signal: post from a mutual/follow, not just an outsider break-in
+    reasons = item.get("reasons", [])
+    is_graph = any(r in reasons for r in ("mutual", "followed", "follower", "trusted_list"))
+    if is_graph:
+        return True
+    # High individual score suggests substance/uptake
+    if item.get("score", 0) > 6:
         return True
     return False
 
