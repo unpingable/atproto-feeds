@@ -304,34 +304,31 @@
         <hr class="rule-double">
 
         {# --- Cluster posts into columns --- #}
-        {# Col 1: Sources — URL clusters, domain bonuses, outsider break-ins with links #}
-        {# Col 2: From the Graph — graph-native posts (mutual/followed/follower), no outsiders #}
+        {# Col 1: Sources — URL clusters, outsider break-ins with links/domains #}
+        {# Col 2: From the Graph — graph-native posts (mutual/followed/follower) #}
         {# Col 3: Sidebar stats + wire items #}
+        {# Rule: graph posts go to Graph first, even if they have domain bonuses. #}
+        {# Sources gets outsiders + URL clusters. This prevents Sources from eating #}
+        {# all the good graph posts just because they linked to something. #}
         {% set source_posts = [] %}
         {% set graph_posts = [] %}
         {% set wire_posts = [] %}
         {% for item in posts %}
             {% set is_url_cluster = item.cluster_type == "url" if item.cluster_type is defined else false %}
             {% set is_outsider = "unknown_author" in item.reasons %}
-            {% set is_graph = false %}
-            {% for r in item.reasons %}
-                {% if r in ("mutual", "followed", "follower", "trusted_list") %}{% set is_graph = true %}{% endif %}
-            {% endfor %}
-            {% set has_source_domain = false %}
-            {% for r in item.reasons %}
-                {% if r.startswith("domain:") %}{% set has_source_domain = true %}{% endif %}
-            {% endfor %}
+            {% set is_graph = "mutual" in item.reasons or "followed" in item.reasons or "follower" in item.reasons or "trusted_list" in item.reasons %}
 
-            {# Sources: URL clusters, outsider break-ins, domain-bonus posts, linked outsiders #}
-            {% if is_url_cluster or has_source_domain or (is_outsider and item.external_uri) %}
-                {% if source_posts|length < 8 %}
-                    {% set _ = source_posts.append(item) %}
-                {% else %}
-                    {% set _ = wire_posts.append(item) %}
-                {% endif %}
-            {# Graph: only actual graph members (mutual/followed/follower) #}
-            {% elif is_graph and graph_posts|length < 8 %}
+            {# Graph posts go to From the Graph first, regardless of links/domains #}
+            {% if is_graph and not is_url_cluster and graph_posts|length < 8 %}
                 {% set _ = graph_posts.append(item) %}
+            {# Sources: URL clusters (any origin) + outsider break-ins #}
+            {% elif (is_url_cluster or is_outsider) and source_posts|length < 8 %}
+                {% set _ = source_posts.append(item) %}
+            {# Overflow from full columns #}
+            {% elif is_graph and graph_posts|length >= 8 %}
+                {% set _ = wire_posts.append(item) %}
+            {% elif (is_url_cluster or is_outsider) and source_posts|length >= 8 %}
+                {% set _ = wire_posts.append(item) %}
             {# Everything else: wire #}
             {% else %}
                 {% set _ = wire_posts.append(item) %}
