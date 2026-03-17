@@ -13,6 +13,7 @@ from . import config, db
 from .ingest import JetstreamConsumer
 from .rank import run_rank
 from .dm_listener import check_dms
+from .feed_dedup import dedup_feed
 from .graph import refresh_graph
 from .site import router as site_router, build_and_freeze_edition
 
@@ -158,7 +159,12 @@ async def get_feed_skeleton(
                 content={"error": "BadCursor", "message": "Invalid cursor"},
             )
 
-    ranked = db.get_ranked_posts(feed_name, limit=limit, cursor_score=cursor_score)
+    # Fetch extra to account for dedup filtering
+    ranked = db.get_ranked_posts(feed_name, limit=limit * 2, cursor_score=cursor_score)
+
+    # Apply cluster dedup + light docket suppression
+    ranked = dedup_feed(ranked, limit=limit)
+
     feed_items = [{"post": item["uri"]} for item in ranked]
 
     next_cursor = None
