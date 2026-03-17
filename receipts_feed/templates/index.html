@@ -196,6 +196,56 @@
     }
     .docket-member a:hover { color: var(--accent); }
 
+    /* --- Marginalia (house ads / notices) --- */
+    .marginalia-block {
+        margin-top: 4px;
+    }
+    .marginalia-label {
+        font-family: var(--mono);
+        font-size: 9px;
+        font-weight: 500;
+        color: var(--fg-dim);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding-bottom: 6px;
+        margin-bottom: 10px;
+        border-bottom: 1px dotted var(--border);
+    }
+    .marginalia-item {
+        font-family: var(--serif);
+        font-size: 13px;
+        color: var(--fg-dim);
+        line-height: 1.5;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        background: var(--bg-inset);
+        border-left: 2px solid var(--border);
+    }
+    .marginalia-item strong {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--accent-dim);
+        letter-spacing: 0.04em;
+        display: block;
+        margin-bottom: 3px;
+    }
+    .marginalia-item em {
+        color: var(--fg);
+    }
+    .marginalia-item a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid var(--accent-dim);
+    }
+    .marginalia-item a:hover { border-bottom-color: var(--accent); }
+    .marginalia-footer {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--fg-dim);
+        font-style: italic;
+        margin-top: 6px;
+    }
+
     /* --- Below the fold --- */
     .below-fold {
         padding-top: 6px;
@@ -496,6 +546,19 @@
                         <div class="col-item-reasons" style="margin-top:4px;">{{ tags(item.reasons, 3) }}</div>
                     </article>
                     {% endfor %}
+                </div>
+                {% endif %}
+
+                {# --- Marginalia --- #}
+                {% if marginalia %}
+                <div class="marginalia-block">
+                    <div class="marginalia-label">House Ads &amp; Notices</div>
+                    {% for item in marginalia %}
+                    <div class="marginalia-item">
+                        {{ item.html }}
+                    </div>
+                    {% endfor %}
+                    <div class="marginalia-footer">Not sponsored. Many should be.</div>
                 </div>
                 {% endif %}
             </div>

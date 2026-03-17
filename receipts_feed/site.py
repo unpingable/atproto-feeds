@@ -18,6 +18,7 @@ from .weather import is_weather_relevant
 from .cluster import build_clustered_edition, persist_clusters
 from .docket import compact_dockets
 from .hydrate import hydrate_posts, at_uri_to_web_url
+from .marginalia import get_marginalia
 from .tags import render_tags_html
 from .watchlist import WATCHLIST
 
@@ -358,6 +359,7 @@ async def homepage(request: Request):
         "relative_time": _relative_time,
         "trunc": _truncate_word,
         "tags": render_tags_html,
+        "marginalia": get_marginalia(count=2),
     })
 
 
