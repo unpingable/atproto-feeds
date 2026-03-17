@@ -311,8 +311,44 @@
         font-weight: 500;
     }
 
+    /* --- Section grid --- */
+    .section-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding: 16px 0 8px;
+    }
+    .section-card {
+        display: block;
+        padding: 14px 16px;
+        background: var(--bg-raised);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        text-decoration: none;
+        transition: border-color 0.15s;
+    }
+    .section-card:hover {
+        border-color: var(--accent-dim);
+    }
+    .section-card-title {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    .section-card-desc {
+        font-family: var(--serif);
+        font-size: 13px;
+        color: var(--fg-dim);
+        line-height: 1.4;
+    }
+
     /* --- Responsive --- */
     @media (max-width: 800px) {
+        .section-grid { grid-template-columns: repeat(2, 1fr); }
         .broadsheet {
             grid-template-columns: 1fr;
             gap: 0;
@@ -324,6 +360,9 @@
         }
         .wire-col { padding: 0; }
         .lead-headline { font-size: 22px; }
+    }
+    @media (max-width: 480px) {
+        .section-grid { grid-template-columns: 1fr; }
     }
 </style>
 {% endblock %}
@@ -611,6 +650,35 @@
             <p>No ranked posts yet. The engine is warming up.</p>
         </div>
         {% endif %}
+
+        {# --- Section grid (discovery layer) --- #}
+        <hr class="rule" style="margin-top: 24px;">
+        <div class="section-grid">
+            <a href="/business" class="section-card">
+                <div class="section-card-title">Business</div>
+                <div class="section-card-desc">Money, software, institutions, and the rituals people mistake for innovation.</div>
+            </a>
+            <a href="/sports" class="section-card">
+                <div class="section-card-title">Sports</div>
+                <div class="section-card-desc">Where play and fandom get translated into wagers, rents, and leverage.</div>
+            </a>
+            <a href="/weather" class="section-card">
+                <div class="section-card-title">Weather</div>
+                <div class="section-card-desc">Where abstraction stops working.</div>
+            </a>
+            <a href="/desk" class="section-card">
+                <div class="section-card-title">Desk</div>
+                <div class="section-card-desc">From the person behind this thing.</div>
+            </a>
+            <a href="/watch" class="section-card">
+                <div class="section-card-title">Watch</div>
+                <div class="section-card-desc">People I don't want to miss.</div>
+            </a>
+            <a href="/feed" class="section-card">
+                <div class="section-card-title">Feed</div>
+                <div class="section-card-desc">Pin the Receipts feed in Bluesky.</div>
+            </a>
+        </div>
 
     </div>{# /wrap-wide #}
 
