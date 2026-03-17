@@ -13,6 +13,7 @@ from . import config, db
 from .ingest import JetstreamConsumer
 from .rank import run_rank
 from .dm_listener import check_dms
+from .graph import refresh_graph
 from .site import router as site_router, build_and_freeze_edition
 
 LOG = logging.getLogger("receipts.api")
@@ -32,8 +33,10 @@ _consumer_task: asyncio.Task | None = None
 _rank_task: asyncio.Task | None = None
 _edition_task: asyncio.Task | None = None
 _dm_task: asyncio.Task | None = None
+_graph_task: asyncio.Task | None = None
 
 DM_CHECK_INTERVAL = 300  # 5 minutes
+GRAPH_REFRESH_INTERVAL = 86400  # 24 hours
 
 
 async def _periodic_rank():
@@ -57,6 +60,19 @@ async def _periodic_dm_check():
         except Exception:
             LOG.exception("DM check failed")
         await asyncio.sleep(DM_CHECK_INTERVAL)
+
+
+async def _periodic_graph_refresh():
+    """Background task to refresh seed graph daily."""
+    loop = asyncio.get_event_loop()
+    await asyncio.sleep(300)  # Wait 5 min after startup
+    while True:
+        try:
+            result = await loop.run_in_executor(None, refresh_graph)
+            LOG.info("graph refresh complete: %s", result)
+        except Exception:
+            LOG.exception("graph refresh failed")
+        await asyncio.sleep(GRAPH_REFRESH_INTERVAL)
 
 
 async def _periodic_edition():
@@ -91,6 +107,9 @@ async def startup():
     _dm_task = asyncio.create_task(_periodic_dm_check())
     LOG.info("started DM listener (interval=%ds)", DM_CHECK_INTERVAL)
 
+    _graph_task = asyncio.create_task(_periodic_graph_refresh())
+    LOG.info("started graph refresh (interval=%ds)", GRAPH_REFRESH_INTERVAL)
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -104,6 +123,8 @@ async def shutdown():
         _edition_task.cancel()
     if _dm_task:
         _dm_task.cancel()
+    if _graph_task:
+        _graph_task.cancel()
 
 
 # -- Feed skeleton endpoint --
@@ -231,16 +252,30 @@ async def debug_stats():
     conn = db.get_conn()
     post_count = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
     author_count = conn.execute("SELECT COUNT(*) FROM authors").fetchone()[0]
+    stale_count = conn.execute("SELECT COUNT(*) FROM authors WHERE seed_class='stale'").fetchone()[0]
     ranked_count = conn.execute("SELECT COUNT(*) FROM ranked_posts").fetchone()[0]
     edition_count = conn.execute("SELECT COUNT(*) FROM editions").fetchone()[0]
+    exclusion_count = conn.execute("SELECT COUNT(*) FROM exclusions WHERE state='excluded'").fetchone()[0]
     conn.close()
     latest = db.get_latest_edition("receipts")
+    last_graph = db.get_state("last_graph_refresh")
     return {
         "posts": post_count,
         "authors": author_count,
+        "authors_stale": stale_count,
+        "exclusions": exclusion_count,
         "ranked": ranked_count,
         "editions": edition_count,
         "latest_edition": latest["edition_id"] if latest else None,
         "latest_edition_at": latest["created_at"] if latest else None,
+        "last_graph_refresh": last_graph,
         "consumer_events": _consumer._event_count if _consumer else 0,
     }
+
+
+@app.post("/debug/refresh-graph")
+async def debug_refresh_graph():
+    """Debug endpoint: trigger manual graph refresh."""
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, refresh_graph)
+    return {"status": "ok", "result": result}

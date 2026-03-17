@@ -30,6 +30,9 @@ def main():
     pub.add_argument("--display-name", default="Receipts")
     pub.add_argument("--description", default="Original, source-bearing, graph-adjacent posts. Less repost sludge. More people showing their work.")
 
+    # refresh
+    sub.add_parser("refresh-graph", help="Refresh seed graph from trust source")
+
     # debug
     sub.add_parser("top", help="Show top ranked posts (debug)")
 
@@ -49,6 +52,13 @@ def main():
         from .graph import bootstrap_graph
         result = bootstrap_graph()
         print(f"Graph bootstrapped: {result}")
+
+    elif args.cmd == "refresh-graph":
+        from . import db
+        from .graph import refresh_graph
+        db.init_db()
+        result = refresh_graph()
+        print(f"Graph refreshed: {result}")
 
     elif args.cmd == "rank":
         from . import db

@@ -151,6 +151,12 @@
         flex-wrap: wrap;
         margin-top: 6px;
     }
+    .cluster-badge {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--accent-dim);
+        margin-left: 6px;
+    }
 
     /* --- Below the fold --- */
     .below-fold {
@@ -305,12 +311,17 @@
         {% set graph_posts = [] %}
         {% set wire_posts = [] %}
         {% for item in posts %}
+            {% set is_url_cluster = item.cluster_type == "url" if item.cluster_type is defined else false %}
             {% set dominated_by_source = false %}
             {% for r in item.reasons %}
                 {% if r.startswith("domain:") %}{% set dominated_by_source = true %}{% endif %}
             {% endfor %}
-            {% if dominated_by_source or (item.external_uri and source_posts|length < 8) %}
-                {% set _ = source_posts.append(item) %}
+            {% if is_url_cluster or dominated_by_source or (item.external_uri and source_posts|length < 8) %}
+                {% if source_posts|length < 8 %}
+                    {% set _ = source_posts.append(item) %}
+                {% else %}
+                    {% set _ = wire_posts.append(item) %}
+                {% endif %}
             {% elif graph_posts|length < 8 %}
                 {% set _ = graph_posts.append(item) %}
             {% else %}
@@ -337,6 +348,7 @@
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
                         {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                         &middot; {{ relative_time(item.created_at) }}
+                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts{% if item.unique_authors and item.unique_authors > 1 %} / {{ item.unique_authors }} authors{% endif %}</span>{% endif %}
                     </div>
                     {% if item.external_uri %}
                     <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
@@ -365,6 +377,7 @@
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
                         {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                         &middot; {{ relative_time(item.created_at) }}
+                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts{% if item.unique_authors and item.unique_authors > 1 %} / {{ item.unique_authors }} authors{% endif %}</span>{% endif %}
                     </div>
                     {% if item.external_uri %}
                     <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
@@ -382,8 +395,10 @@
             <div class="broadsheet-col">
                 <div class="sidebar-block">
                     <div class="sidebar-title">This Edition</div>
-                    <div class="sidebar-stat"><strong>{{ stats.total }}</strong> posts ranked</div>
+                    <div class="sidebar-stat"><strong>{{ stats.total }}</strong> stories</div>
                     <div class="sidebar-stat"><strong>{{ stats.original_pct }}%</strong> original content</div>
+                    {% if stats.url_clusters %}<div class="sidebar-stat"><strong>{{ stats.url_clusters }}</strong> url clusters</div>{% endif %}
+                    {% if stats.root_clusters %}<div class="sidebar-stat"><strong>{{ stats.root_clusters }}</strong> thread clusters</div>{% endif %}
                 </div>
                 {% if stats.top_domains %}
                 <div class="sidebar-block">

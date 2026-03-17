@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import config, db, timeutil
 from .domains import is_platform_domain
+from .cluster import build_clustered_edition, persist_clusters
 from .hydrate import hydrate_posts, at_uri_to_web_url
 from .tags import render_tags_html
 from .watchlist import WATCHLIST
@@ -102,37 +103,52 @@ def _extract_display_domain(uri: str | None) -> str | None:
 # --- Edition builder (used by the periodic freeze task) ---
 
 def build_and_freeze_edition(limit: int = 30) -> str | None:
-    """Build a fresh edition from ranked posts, hydrate, and freeze to DB.
+    """Build a fresh edition from clusters, hydrate lead posts, freeze to DB.
 
     Called periodically (every 15 min) by the edition clock in api.py.
     Returns the edition_id, or None if nothing to publish.
     """
-    ranked = db.get_ranked_posts("receipts", limit=limit + 10)
-    if not ranked:
+    # Build clusters from ranked posts
+    clusters = build_clustered_edition(limit=limit)
+    if not clusters:
         return None
 
-    uris = [r["uri"] for r in ranked]
-    hydrated = hydrate_posts(uris)
+    # Persist cluster state for tracking across editions
+    try:
+        persist_clusters(clusters)
+    except Exception:
+        LOG.exception("failed to persist clusters (non-fatal)")
+
+    # Hydrate lead posts from each cluster for display
+    lead_uris = [c["lead_post_uri"] for c in clusters]
+    hydrated = hydrate_posts(lead_uris)
 
     items = []
-    for r in ranked:
+    for c in clusters:
         if len(items) >= limit:
             break
-        h = hydrated.get(r["uri"])
+        h = hydrated.get(c["lead_post_uri"])
         if not h:
             continue
         raw_headline = h.get("display_headline", "") or h.get("text", "")
         h["display_headline"] = _clean_headline(raw_headline) or raw_headline
         items.append({
             **h,
-            "score": r["score"],
-            "reasons": r["reasons"],
+            "score": c["cluster_score"],
+            "reasons": c["lead_reasons"],
+            # Cluster metadata for the template
+            "cluster_type": c["cluster_type"],
+            "cluster_id": c["cluster_id"],
+            "post_count": c["post_count"],
+            "unique_authors": c["unique_authors"],
+            "cluster_state": c.get("state", "active"),
+            "canonical_url": c.get("canonical_url"),
         })
 
     if not items:
         return None
 
-    # Find hero
+    # Find hero: first hero-eligible item
     hero_idx = 0
     for i, item in enumerate(items):
         if _is_hero_eligible(item):
@@ -142,21 +158,34 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     # Compute stats
     domains = Counter()
     original_count = 0
+    url_cluster_count = 0
+    root_cluster_count = 0
+    singleton_count = 0
     for item in items:
-        d = _extract_display_domain(item.get("external_uri"))
+        d = _extract_display_domain(item.get("external_uri") or item.get("canonical_url"))
         if d:
             domains[d] += 1
         if "original" in item.get("reasons", []):
             original_count += 1
+        ct = item.get("cluster_type", "singleton")
+        if ct == "url":
+            url_cluster_count += 1
+        elif ct == "root":
+            root_cluster_count += 1
+        else:
+            singleton_count += 1
 
     total = len(items) or 1
     stats = {
         "total": len(items),
         "original_pct": round(100 * original_count / total),
         "top_domains": domains.most_common(5),
+        "url_clusters": url_cluster_count,
+        "root_clusters": root_cluster_count,
+        "singletons": singleton_count,
     }
 
-    # Compute edition number (sequential)
+    # Edition number
     conn = db.get_conn()
     row = conn.execute("SELECT COUNT(*) FROM editions WHERE feed_name = 'receipts'").fetchone()
     conn.close()
@@ -164,7 +193,10 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     stats["edition_num"] = edition_num
 
     edition_id = db.save_edition("receipts", items, stats, hero_idx)
-    LOG.info("froze edition #%d (%s): %d items, hero=%d", edition_num, edition_id, len(items), hero_idx)
+    LOG.info(
+        "froze edition #%d (%s): %d items (%d url clusters, %d root clusters, %d singletons), hero=%d",
+        edition_num, edition_id, len(items), url_cluster_count, root_cluster_count, singleton_count, hero_idx,
+    )
     return edition_id
 
 

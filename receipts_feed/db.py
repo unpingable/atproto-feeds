@@ -98,6 +98,39 @@ def init_db():
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS story_clusters (
+            cluster_id TEXT PRIMARY KEY,
+            cluster_type TEXT,
+            cluster_key TEXT,
+            canonical_url TEXT,
+            root_uri TEXT,
+            domain TEXT,
+            title_norm TEXT,
+            first_seen_at TEXT,
+            last_seen_at TEXT,
+            state TEXT DEFAULT 'active',
+            lead_post_uri TEXT,
+            lead_score REAL DEFAULT 0,
+            cluster_score REAL DEFAULT 0,
+            post_count INTEGER DEFAULT 0,
+            unique_authors INTEGER DEFAULT 0,
+            editions_present INTEGER DEFAULT 0
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cluster_members (
+            cluster_id TEXT,
+            post_uri TEXT,
+            author_did TEXT,
+            post_score REAL DEFAULT 0,
+            joined_at TEXT,
+            is_lead INTEGER DEFAULT 0,
+            PRIMARY KEY (cluster_id, post_uri)
+        )
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS exclusions (
             did TEXT PRIMARY KEY,
             requested_at TEXT,
@@ -108,6 +141,11 @@ def init_db():
     """)
 
     # Indexes
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_type ON story_clusters(cluster_type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_key ON story_clusters(cluster_key)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_state ON story_clusters(state)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_score ON story_clusters(cluster_score DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cluster_members_post ON cluster_members(post_uri)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_editions_feed ON editions(feed_name, created_at DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_did)")
