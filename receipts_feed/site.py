@@ -13,6 +13,8 @@ from fastapi.templating import Jinja2Templates
 from . import config, db, timeutil
 from .domains import is_platform_domain
 from .business import is_business_relevant
+from .sports import is_sports_relevant
+from .weather import is_weather_relevant
 from .cluster import build_clustered_edition, persist_clusters
 from .docket import compact_dockets
 from .hydrate import hydrate_posts, at_uri_to_web_url
@@ -497,11 +499,42 @@ async def watch(request: Request):
 async def business(request: Request):
     edition = _get_current_edition()
     items = edition.get("items", [])
-    # Filter to business-relevant items
     biz_items = [item for item in items if is_business_relevant(item)]
     return templates.TemplateResponse("business.html", {
         "request": request,
         "posts": biz_items,
+        "stats": edition.get("stats", {}),
+        "updated_at": edition.get("created_at"),
+        "relative_time": _relative_time,
+        "trunc": _truncate_word,
+        "tags": render_tags_html,
+    })
+
+
+@router.get("/sports", response_class=HTMLResponse)
+async def sports(request: Request):
+    edition = _get_current_edition()
+    items = edition.get("items", [])
+    sports_items = [item for item in items if is_sports_relevant(item)]
+    return templates.TemplateResponse("sports.html", {
+        "request": request,
+        "posts": sports_items,
+        "stats": edition.get("stats", {}),
+        "updated_at": edition.get("created_at"),
+        "relative_time": _relative_time,
+        "trunc": _truncate_word,
+        "tags": render_tags_html,
+    })
+
+
+@router.get("/weather", response_class=HTMLResponse)
+async def weather_page(request: Request):
+    edition = _get_current_edition()
+    items = edition.get("items", [])
+    wx_items = [item for item in items if is_weather_relevant(item)]
+    return templates.TemplateResponse("weather.html", {
+        "request": request,
+        "posts": wx_items,
         "stats": edition.get("stats", {}),
         "updated_at": edition.get("created_at"),
         "relative_time": _relative_time,
