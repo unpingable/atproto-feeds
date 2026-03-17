@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import config, db, timeutil
 from .domains import is_platform_domain
+from .business import is_business_relevant
 from .cluster import build_clustered_edition, persist_clusters
 from .hydrate import hydrate_posts, at_uri_to_web_url
 from .tags import render_tags_html
@@ -480,4 +481,23 @@ async def watch(request: Request):
         "request": request,
         "authors": authors,
         "relative_time": _relative_time,
+    })
+
+
+# --- BUSINESS: filtered lens ---
+
+@router.get("/business", response_class=HTMLResponse)
+async def business(request: Request):
+    edition = _get_current_edition()
+    items = edition.get("items", [])
+    # Filter to business-relevant items
+    biz_items = [item for item in items if is_business_relevant(item)]
+    return templates.TemplateResponse("business.html", {
+        "request": request,
+        "posts": biz_items,
+        "stats": edition.get("stats", {}),
+        "updated_at": edition.get("created_at"),
+        "relative_time": _relative_time,
+        "trunc": _truncate_word,
+        "tags": render_tags_html,
     })

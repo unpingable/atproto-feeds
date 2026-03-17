@@ -7,5 +7,7 @@ are surfaced on /watch, not boosted into the main edition.
 # Handles or DIDs of authors you want on the watch page.
 # This is taste, not ranking. Add whoever you want.
 WATCHLIST: list[str] = [
-    # Example: "importantperson.bsky.social",
+    "propublica.org",
+    "aelkus.bsky.social",
+    "lastnpcalex.agency",
 ]
