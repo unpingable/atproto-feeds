@@ -415,9 +415,7 @@
                     {%- else %}View post{% endif -%}
                 </a>
             </h2>
-            {% if lead.text and lead.display_headline != lead.text and lead.text|length > 20 %}
-            <p class="lead-excerpt">{{ trunc(lead.text, 300) }}</p>
-            {% elif lead.text|length > 160 %}
+            {% if excerpt_ok(lead.display_headline, lead.text) %}
             <p class="lead-excerpt">{{ trunc(lead.text, 300) }}</p>
             {% endif %}
             <div class="lead-byline">
@@ -492,7 +490,7 @@
                             {{ trunc(item.display_headline or item.text, 90) }}
                         </a>
                     </div>
-                    {% if item.text and item.display_headline != item.text %}
+                    {% if excerpt_ok(item.display_headline, item.text) %}
                     <div class="col-item-excerpt">{{ trunc(item.text, 160) }}</div>
                     {% endif %}
                     <div class="col-item-meta">
@@ -522,7 +520,7 @@
                     <div class="col-item-headline">
                         <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 90) }}</a>
                     </div>
-                    {% if item.text|length > 80 %}
+                    {% if excerpt_ok(item.display_headline, item.text) %}
                     <div class="col-item-excerpt">{{ trunc(item.text, 160) }}</div>
                     {% endif %}
                     <div class="col-item-meta">

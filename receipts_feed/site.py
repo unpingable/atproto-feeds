@@ -233,15 +233,48 @@ def _get_current_edition() -> dict:
 
 
 def _truncate_word(text: str, limit: int) -> str:
-    """Truncate text at a word boundary, no mid-word cuts."""
+    """Truncate text at a sentence boundary when possible, otherwise word boundary."""
     if len(text) <= limit:
         return text
-    # Find last space before the limit
-    cut = text[:limit].rfind(" ")
-    if cut < limit * 0.5:
-        # No good break point — just use the limit
+    # Try to find a sentence boundary (. ! ?) within the limit window
+    # Look in the back half of the limit to avoid cutting too short
+    window = text[:limit]
+    best_sentence_end = -1
+    for i in range(len(window) - 1, max(int(limit * 0.4), 20), -1):
+        if window[i] in '.!?' and (i + 1 >= len(window) or window[i + 1] in ' "\'\n)'):
+            best_sentence_end = i + 1
+            break
+    if best_sentence_end > 0:
+        return text[:best_sentence_end].rstrip()
+    # No good sentence break — fall back to word boundary
+    cut = window.rfind(" ")
+    if cut < limit * 0.4:
         cut = limit
     return text[:cut].rstrip() + "..."
+
+
+def _excerpt_differs(headline: str, text: str) -> bool:
+    """Check if showing an excerpt would add meaningfully different content.
+
+    Only returns True when the headline came from a different source
+    (e.g. embed title) and the post text adds real context. Does NOT
+    return True just because the text is longer than the headline —
+    that just creates duplicate-looking content.
+    """
+    if not text or not headline:
+        return False
+    # Normalize for comparison
+    h_clean = headline.strip().rstrip(".!?…")
+    t_clean = text.strip()
+    # If the text starts with the headline (headline is a truncation of text),
+    # showing an excerpt just duplicates. Skip.
+    if t_clean.startswith(h_clean[:30]):
+        return False
+    # If headline starts with the text (text is short), no excerpt needed
+    if h_clean.startswith(t_clean[:30]):
+        return False
+    # Headlines came from different sources — show the excerpt
+    return True
 
 
 def _relative_time(iso_str: str) -> str:
@@ -359,6 +392,7 @@ async def homepage(request: Request):
         "relative_time": _relative_time,
         "trunc": _truncate_word,
         "tags": render_tags_html,
+        "excerpt_ok": _excerpt_differs,
         "marginalia": get_marginalia(count=2),
     })
 
