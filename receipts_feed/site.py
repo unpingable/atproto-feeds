@@ -219,6 +219,45 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     return edition_id
 
 
+def _compute_edition_diff() -> dict:
+    """Compare current and previous editions. Returns {new, fading, gone} lists."""
+    current = db.get_latest_edition("receipts")
+    previous = db.get_previous_edition("receipts")
+    if not current or not previous:
+        return {"new": [], "fading": [], "count_new": 0, "count_gone": 0}
+
+    curr_uris = {item.get("uri", "") for item in current.get("items", [])}
+    prev_uris = {item.get("uri", "") for item in previous.get("items", [])}
+
+    # Build lookup by URI for display
+    curr_by_uri = {item.get("uri", ""): item for item in current.get("items", [])}
+    prev_by_uri = {item.get("uri", ""): item for item in previous.get("items", [])}
+
+    new_uris = curr_uris - prev_uris
+    gone_uris = prev_uris - curr_uris
+
+    new_items = []
+    for uri in new_uris:
+        item = curr_by_uri.get(uri, {})
+        headline = item.get("display_headline", "") or item.get("text", "")
+        if headline:
+            new_items.append({"headline": _truncate_word(headline, 60), "web_url": item.get("web_url", "")})
+
+    fading_items = []
+    for uri in gone_uris:
+        item = prev_by_uri.get(uri, {})
+        headline = item.get("display_headline", "") or item.get("text", "")
+        if headline:
+            fading_items.append({"headline": _truncate_word(headline, 60), "web_url": item.get("web_url", "")})
+
+    return {
+        "new": new_items[:5],
+        "fading": fading_items[:3],
+        "count_new": len(new_uris),
+        "count_gone": len(gone_uris),
+    }
+
+
 def _get_current_edition() -> dict:
     """Get the latest frozen edition, or build one live as fallback."""
     edition = db.get_latest_edition("receipts")
@@ -394,6 +433,7 @@ async def homepage(request: Request):
         "tags": render_tags_html,
         "excerpt_ok": _excerpt_differs,
         "marginalia": get_marginalia(count=2),
+        "diff": _compute_edition_diff(),
     })
 
 

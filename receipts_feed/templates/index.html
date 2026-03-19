@@ -550,6 +550,28 @@
                     {% if stats.url_clusters %}<div class="sidebar-stat"><strong>{{ stats.url_clusters }}</strong> url clusters</div>{% endif %}
                     {% if stats.root_clusters %}<div class="sidebar-stat"><strong>{{ stats.root_clusters }}</strong> thread clusters</div>{% endif %}
                 </div>
+                {% if diff and (diff.new or diff.fading) %}
+                <div class="sidebar-block">
+                    <div class="sidebar-title">Since Last Edition</div>
+                    {% if diff.new %}
+                    <div class="sidebar-stat" style="margin-bottom: 6px;"><strong>{{ diff.count_new }}</strong> new{% if diff.count_gone %} / <strong>{{ diff.count_gone }}</strong> gone{% endif %}</div>
+                    {% for item in diff.new %}
+                    <div class="sidebar-domain-row" style="border-bottom: 1px dotted var(--border); padding: 3px 0;">
+                        <a href="{{ item.web_url }}" style="color: var(--fg); text-decoration: none; font-family: var(--serif); font-size: 12px;">{{ item.headline }}</a>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% if diff.fading %}
+                    <div style="font-family: var(--mono); font-size: 10px; color: var(--fg-dim); margin-top: 8px; margin-bottom: 4px;">Fading</div>
+                    {% for item in diff.fading %}
+                    <div class="sidebar-domain-row" style="border-bottom: 1px dotted var(--border); padding: 2px 0;">
+                        <span style="color: var(--fg-dim); font-family: var(--serif); font-size: 11px; font-style: italic;">{{ item.headline }}</span>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 {% if stats.top_domains %}
                 <div class="sidebar-block">
                     <div class="sidebar-title">Top Domains</div>

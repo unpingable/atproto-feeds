@@ -322,6 +322,26 @@ def get_state(key: str) -> Optional[str]:
     return row[0] if row else None
 
 
+def get_previous_edition(feed_name: str) -> Optional[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT edition_id, created_at, items_json, stats_json, hero_idx "
+        "FROM editions WHERE feed_name = ? ORDER BY created_at DESC LIMIT 2",
+        (feed_name,),
+    ).fetchall()
+    conn.close()
+    if len(rows) < 2:
+        return None
+    row = rows[1]  # Second most recent
+    return {
+        "edition_id": row[0],
+        "created_at": row[1],
+        "items": json.loads(row[2]),
+        "stats": json.loads(row[3]),
+        "hero_idx": row[4],
+    }
+
+
 def purge_old_posts(hours: int = 48):
     conn = get_conn()
     cutoff = (timeutil.now_utc() - __import__("datetime").timedelta(hours=hours)).isoformat()
