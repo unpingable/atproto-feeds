@@ -422,6 +422,7 @@
                 {% if stats.edition_num %}Edition {{ "%04d"|format(stats.edition_num) }} /{% endif %}
                 {% if updated_at %}{{ relative_time(updated_at) }}{% endif %}
                 {% if stats.total %} / {{ stats.total }} items{% endif %}
+                {% if stats.character %} / {{ stats.character }}{% endif %}
             </span>
             <nav class="nav-inline">
                 <a href="/" class="active">Home</a>

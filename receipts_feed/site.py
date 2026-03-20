@@ -113,6 +113,52 @@ def _extract_display_domain(uri: str | None) -> str | None:
         return None
 
 
+def _edition_character(
+    total: int, url_clusters: int, root_clusters: int, dockets: int,
+    graph_count: int, outsider_count: int, original_pct: int,
+    domains: Counter,
+) -> str:
+    """Generate a one-line edition character summary.
+
+    Deterministic, based on composition. Not trying to be clever —
+    just a dry factual read of what kind of edition this is.
+    """
+    if total == 0:
+        return "Empty edition"
+
+    traits = []
+
+    # Dominant composition type
+    if url_clusters >= total * 0.3:
+        traits.append("cluster-heavy")
+    if dockets >= 2:
+        traits.append("document-heavy")
+    if outsider_count > graph_count:
+        traits.append("outsider-led")
+    elif graph_count > outsider_count * 2:
+        traits.append("graph-heavy")
+
+    # Domain character
+    top = domains.most_common(3)
+    if top:
+        top_domain, top_count = top[0]
+        if top_count >= 4:
+            traits.append(f"{top_domain}-dominated")
+        elif len(top) >= 3 and sum(c for _, c in top[:3]) >= total * 0.5:
+            traits.append("source-diverse")
+
+    # Fallback
+    if not traits:
+        if original_pct >= 90:
+            traits.append("high-originality")
+        else:
+            traits.append("mixed")
+
+    # Build summary
+    summary = ", ".join(traits[:2])
+    return summary.capitalize() if summary else "Standard edition"
+
+
 # --- Edition builder (used by the periodic freeze task) ---
 
 def build_and_freeze_edition(limit: int = 30) -> str | None:
@@ -195,13 +241,29 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
             singleton_count += 1
 
     total = len(items) or 1
+    original_pct = round(100 * original_count / total)
+
+    # Count graph vs outsider
+    graph_count = sum(1 for item in items if any(
+        r in item.get("reasons", []) for r in ("mutual", "followed", "follower", "trusted_list")
+    ))
+    outsider_count = sum(1 for item in items if "unknown_author" in item.get("reasons", []))
+    docket_count = sum(1 for item in items if item.get("is_docket"))
+
+    # Generate edition character summary
+    character = _edition_character(
+        total, url_cluster_count, root_cluster_count, docket_count,
+        graph_count, outsider_count, original_pct, domains,
+    )
+
     stats = {
-        "total": len(items),
-        "original_pct": round(100 * original_count / total),
+        "total": total,
+        "original_pct": original_pct,
         "top_domains": domains.most_common(5),
         "url_clusters": url_cluster_count,
         "root_clusters": root_cluster_count,
         "singletons": singleton_count,
+        "character": character,
     }
 
     # Edition number
@@ -462,6 +524,7 @@ async def archive(request: Request):
             "url_clusters": stats.get("url_clusters", 0),
             "hero_headline": hero_headline,
             "top_domains": top_domains,
+            "character": stats.get("character", ""),
         })
     return templates.TemplateResponse("archive.html", {
         "request": request,
