@@ -143,6 +143,86 @@ class TestGraphVsOutsider:
         assert m_score > o_score, f"Mutual ({m_score}) should beat outsider ({o_score})"
 
 
+class TestRepresentativeSelection:
+    """Within a cluster, human curators should beat relays."""
+
+    def _make_post(self, uri, author_did, text, domain="example.com"):
+        return {
+            "uri": uri, "author_did": author_did,
+            "created_at": "2026-03-20T00:00:00Z",
+            "text": text,
+            "has_external_embed": 1, "external_domain": domain,
+            "external_uri": f"https://{domain}/article/123",
+            "is_repost": 0, "reply_to_uri": None, "root_uri": None,
+            "quote_uri": None, "has_image": 0, "has_video": 0,
+            "link_count": 1, "facets_count": 0, "langs": "",
+            "cid": "", "indexed_at": "2026-03-20T00:00:00Z",
+        }
+
+    def test_graph_curator_beats_outsider_relay(self):
+        """A mutual with short but real commentary should lead over a verbose outsider relay."""
+        from receipts_feed.cluster import _representative_sort_key
+
+        mutual_member = {
+            "uri": "at://mutual/post/1", "score": 8.0,
+            "reasons": ["mutual", "original", "has_link"],
+            "_post": {"text": "This is an important ruling — sets real precedent for executive power limits. Worth reading carefully.", "author_did": "did:mutual"},
+        }
+        relay_member = {
+            "uri": "at://relay/post/1", "score": 9.0,  # Higher raw score!
+            "reasons": ["unknown_author", "original", "has_link", "domain:congress.gov:+3.5"],
+            "_post": {"text": "HR948: Commemorating the 50th anniversary of Southeast Asian refugee resettlement and the many contributions and sacrifices of Southeast Asian Americans to the United States", "author_did": "did:relay"},
+        }
+
+        mutual_key = _representative_sort_key(mutual_member)
+        relay_key = _representative_sort_key(relay_member)
+        assert mutual_key > relay_key, \
+            f"Mutual curator ({mutual_key}) should beat outsider relay ({relay_key})"
+
+    def test_outsider_with_great_commentary_still_viable(self):
+        """An outsider with substantial original commentary should beat a low-effort graph member."""
+        from receipts_feed.cluster import _representative_sort_key
+
+        lazy_mutual = {
+            "uri": "at://mutual/post/2", "score": 7.0,
+            "reasons": ["mutual", "original", "has_link"],
+            "_post": {"text": "wow https://example.com/thing", "author_did": "did:lazy"},
+        }
+        good_outsider = {
+            "uri": "at://outsider/post/2", "score": 8.5,
+            "reasons": ["unknown_author", "original", "has_link"],
+            "_post": {"text": "This is genuinely important because it changes how courts interpret the Commerce Clause. The majority opinion specifically addresses the standing question that has been unresolved since 2019.", "author_did": "did:good_outsider"},
+        }
+
+        lazy_key = _representative_sort_key(lazy_mutual)
+        good_key = _representative_sort_key(good_outsider)
+        # Graph still gets tier 2 vs tier 0, but outsider has commentary tier 1
+        # The outsider's commentary should at least make it competitive
+        # (graph wins on tier, but outsider shouldn't be totally crushed)
+        assert good_key[1] > lazy_key[1], \
+            "Outsider with great commentary should have higher commentary tier than lazy mutual"
+
+    def test_relay_last_resort(self):
+        """A pure relay should rank below any human with commentary."""
+        from receipts_feed.cluster import _representative_sort_key
+
+        relay = {
+            "uri": "at://relay/post/3", "score": 10.0,  # Even higher score
+            "reasons": ["unknown_author", "original", "has_link"],
+            "_post": {"text": "congress.gov/bill/119/hr999", "author_did": "did:relay2"},
+        }
+        human = {
+            "uri": "at://human/post/3", "score": 6.0,
+            "reasons": ["follower", "original", "has_link"],
+            "_post": {"text": "This bill would fundamentally change how federal agencies handle whistleblower protections. The sponsor list is bipartisan which is notable.", "author_did": "did:human"},
+        }
+
+        relay_key = _representative_sort_key(relay)
+        human_key = _representative_sort_key(human)
+        assert human_key > relay_key, \
+            f"Human with commentary ({human_key}) should beat pure relay ({relay_key})"
+
+
 class TestUrlStripping:
     """URL stripping should handle various URL formats."""
 

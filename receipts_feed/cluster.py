@@ -259,6 +259,32 @@ def build_clusters(ranked_posts: list[dict], post_details: dict[str, dict]) -> l
     return all_clusters
 
 
+def _representative_sort_key(member: dict) -> tuple:
+    """Sort key for choosing cluster representative.
+
+    Prefers human curators over relays, even when relay text is longer.
+    Returns a tuple for multi-level sort (higher = better).
+    """
+    reasons = member.get("reasons", [])
+    post = member.get("_post", {})
+    score = member.get("score", 0)
+
+    # Tier 1: relationship (graph > outsider)
+    is_graph = any(r in reasons for r in ("mutual", "followed", "follower", "trusted_list"))
+    graph_tier = 2 if is_graph else 0
+
+    # Tier 2: commentary quality (strip URLs, measure real text)
+    text = post.get("text", "")
+    # Inline URL stripping (avoid circular import)
+    import re
+    non_url = re.sub(r'https?://\S+|www\.\S+|\S+\.\w{2,4}/\S+', '', text)
+    non_url = re.sub(r'\S+\.(com|org|gov|net|io|co|edu|news)/\S*', '', non_url).strip()
+    commentary_tier = 1 if len(non_url) > 60 else 0
+
+    # Tier 3: raw score as tiebreaker
+    return (graph_tier, commentary_tier, score)
+
+
 def _build_cluster(
     cluster_type: str,
     cluster_key: str,
@@ -268,8 +294,9 @@ def _build_cluster(
     domain: str = None,
 ) -> dict:
     """Build a cluster dict from its members and compute scores."""
-    # Sort members by score descending
-    members.sort(key=lambda m: m["score"], reverse=True)
+    # Sort members by representative preference, not just raw score.
+    # Graph members with commentary beat outsider relays with longer text.
+    members.sort(key=_representative_sort_key, reverse=True)
     lead = members[0]
     lead_post = lead["_post"]
 
@@ -339,6 +366,20 @@ def _build_cluster(
             "is_lead": i == 0,
         })
 
+    # Determine why lead was chosen
+    lead_reasons_list = lead.get("reasons", [])
+    lead_is_graph = any(r in lead_reasons_list for r in ("mutual", "followed", "follower", "trusted_list"))
+    if n > 1 and lead_is_graph:
+        suppressed_outsiders = sum(1 for m in members[1:] if "unknown_author" in m.get("reasons", []))
+        if suppressed_outsiders:
+            lead_reason = f"graph member chosen over {suppressed_outsiders} outsider(s)"
+        else:
+            lead_reason = "graph member with best commentary"
+    elif n > 1:
+        lead_reason = "best representative by score"
+    else:
+        lead_reason = "singleton"
+
     return {
         "cluster_id": f"{cluster_type}_{cluster_key}",
         "cluster_type": cluster_type,
@@ -355,8 +396,8 @@ def _build_cluster(
         "post_count": n,
         "unique_authors": author_count,
         "members": member_list,
-        # Carry the lead post's display data for the edition
         "lead_reasons": lead["reasons"],
+        "lead_reason": lead_reason,
     }
 
 
