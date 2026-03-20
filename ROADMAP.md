@@ -137,6 +137,20 @@ underlying source is thinner than the heat suggests."
 
 Daily snapshots, browsable by date. Edition history with diffs.
 
+## Known issues
+
+### Source-bot dominance
+Outsider break-ins are currently dominated by bots that post bare links
+to primary sources (congress.gov, pubmed, etc) without substantive
+commentary. These score well on domain bonus + originality but add no
+editorial value. Need to either:
+- Detect and penalize low-text-high-link bot patterns
+- Require minimum text substance for outsider domain bonuses
+- Maintain a bot/tracker author list with reduced weight
+- Or some combination
+
+This is the main quality problem with the current outsider pipeline.
+
 ## Design constraints (persistent)
 
 - Feed ranks posts. Homepage ranks clusters.

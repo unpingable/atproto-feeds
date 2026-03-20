@@ -76,6 +76,65 @@ def _url_key(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()[:16]
 
 
+# Stopwords for title normalization
+_TITLE_STOPWORDS = {"the", "a", "an", "of", "in", "on", "at", "to", "for", "is", "are", "was",
+                     "and", "or", "but", "by", "with", "from", "that", "this", "has", "have"}
+
+
+def _normalize_title(text: str) -> str:
+    """Normalize text into a comparable title slug."""
+    # Lowercase, strip URLs, strip punctuation
+    text = text.lower()
+    text = re.sub(r'https?://\S+', '', text)
+    text = re.sub(r'www\.\S+', '', text)
+    text = re.sub(r'[^\w\s]', ' ', text)
+    words = [w for w in text.split() if w not in _TITLE_STOPWORDS and len(w) > 2]
+    return " ".join(words[:6])
+
+
+def _domain_family(domain: str) -> str:
+    """Map domain to a family for cross-domain clustering."""
+    # Known reporting families that often cover the same story
+    families = {
+        "apnews.com": "wire",
+        "reuters.com": "wire",
+        "bbc.com": "wire", "bbc.co.uk": "wire",
+        "congress.gov": "legislative",
+        "courtlistener.com": "legal", "storage.courtlistener.com": "legal",
+        "supremecourt.gov": "legal",
+        "pubmed.ncbi.nlm.nih.gov": "research",
+        "arxiv.org": "research",
+        "nature.com": "research",
+        "science.org": "research",
+    }
+    d = domain.lower()
+    if d in families:
+        return families[d]
+    for fd, fam in families.items():
+        if d.endswith("." + fd):
+            return fam
+    return d  # Use domain itself as family for unknowns
+
+
+def _make_title_key(domain: str, text: str) -> str:
+    """Create a cluster key from domain family + sorted significant words.
+
+    Uses sorted word bag (not position-dependent) so different phrasings
+    of the same story cluster together. Only clusters within the same
+    domain family to avoid false matches across unrelated domains.
+    """
+    norm = _normalize_title(text)
+    words = norm.split()
+    if len(words) < 3:
+        return ""  # Too short to reliably cluster
+    # Use the 5 most significant words, sorted, as the key
+    # This makes "Iran strikes Israel retaliation Damascus" match
+    # "Iran retaliates against Israel following Damascus"
+    key_words = sorted(words[:7])[:5]
+    family = _domain_family(domain)
+    return f"{family}:{' '.join(key_words)}"
+
+
 # --- Cluster building ---
 
 def build_clusters(ranked_posts: list[dict], post_details: dict[str, dict]) -> list[dict]:
@@ -143,6 +202,41 @@ def build_clusters(ranked_posts: list[dict], post_details: dict[str, dict]) -> l
         )
         root_clusters.append(cluster)
 
+    # Phase 2.5: Domain+title fallback clusters
+    # Posts linking to the same domain family with similar headlines
+    # (e.g. AP, Reuters, NYT all covering the same story with different URLs)
+    title_groups = defaultdict(list)
+    for r in ranked_posts:
+        if r["uri"] in claimed:
+            continue
+        post = post_details.get(r["uri"])
+        if not post:
+            continue
+        domain = post.get("external_domain", "")
+        if not domain or is_platform_domain(domain):
+            continue
+        text = post.get("text", "")
+        if len(text) < 30:
+            continue
+        # Normalize: domain family + first 5 significant words
+        title_key = _make_title_key(domain, text)
+        if title_key:
+            title_groups[title_key].append({**r, "_post": post})
+
+    title_clusters = []
+    for key, members in title_groups.items():
+        if len(members) < 2:
+            continue
+        uris = {m["uri"] for m in members}
+        claimed.update(uris)
+        cluster = _build_cluster(
+            cluster_type="headline",
+            cluster_key=hashlib.sha256(key.encode()).hexdigest()[:16],
+            members=members,
+            domain=members[0]["_post"].get("external_domain", ""),
+        )
+        title_clusters.append(cluster)
+
     # Phase 3: Singletons (everything unclaimed)
     singleton_clusters = []
     for r in ranked_posts:
@@ -159,7 +253,7 @@ def build_clusters(ranked_posts: list[dict], post_details: dict[str, dict]) -> l
         singleton_clusters.append(cluster)
 
     # Combine and sort by cluster score
-    all_clusters = url_clusters + root_clusters + singleton_clusters
+    all_clusters = url_clusters + root_clusters + title_clusters + singleton_clusters
     all_clusters.sort(key=lambda c: c["cluster_score"], reverse=True)
 
     return all_clusters
@@ -171,6 +265,7 @@ def _build_cluster(
     members: list[dict],
     canonical_url: str = None,
     root_uri: str = None,
+    domain: str = None,
 ) -> dict:
     """Build a cluster dict from its members and compute scores."""
     # Sort members by score descending
@@ -181,8 +276,9 @@ def _build_cluster(
     # Unique authors
     author_dids = {m["_post"]["author_did"] for m in members}
 
-    # Domain from lead post
-    domain = lead_post.get("external_domain") or ""
+    # Domain from lead post (or passed-in for headline clusters)
+    if not domain:
+        domain = lead_post.get("external_domain") or ""
     if canonical_url:
         try:
             d = urlparse(canonical_url).hostname or ""
