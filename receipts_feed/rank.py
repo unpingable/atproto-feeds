@@ -215,7 +215,7 @@ def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
             ).fetchone()
             conn.close()
             outsider_domain_posts = count_row[0] if count_row else 0
-            if outsider_domain_posts >= 10:
+            if outsider_domain_posts > 10:
                 penalty = min((outsider_domain_posts - 10) * 0.2, 4.0)
                 score -= penalty
                 reasons.append(f"outsider_relay:-{penalty:.1f}")
