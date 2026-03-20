@@ -88,16 +88,16 @@ def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
         seed_class = author.get("seed_class", "")
 
         if seed_class == "mutual":
-            score += 4.0
+            score += 5.0
             reasons.append("mutual")
         elif seed_class == "followed":
-            score += 2.0
+            score += 3.0
             reasons.append("followed")
         elif seed_class == "trusted_list":
-            score += 3.0
+            score += 4.0
             reasons.append("trusted_list")
         elif seed_class == "follower":
-            score += 1.0
+            score += 1.5
             reasons.append("follower")
 
         trusted_score = author.get("trusted_score", 0)

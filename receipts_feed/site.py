@@ -167,8 +167,8 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     Called periodically (every 15 min) by the edition clock in api.py.
     Returns the edition_id, or None if nothing to publish.
     """
-    # Build clusters from ranked posts
-    clusters = build_clustered_edition(limit=limit)
+    # Build clusters — fetch extra to ensure graph posts aren't crowded out
+    clusters = build_clustered_edition(limit=limit + 10)
     if not clusters:
         return None
 
