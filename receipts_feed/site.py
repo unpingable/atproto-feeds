@@ -533,6 +533,35 @@ async def archive(request: Request):
     })
 
 
+@router.get("/edition/{edition_id}", response_class=HTMLResponse)
+async def edition_detail(request: Request, edition_id: str):
+    """View a specific frozen edition."""
+    edition = db.get_edition_by_id(edition_id)
+    if not edition:
+        return templates.TemplateResponse("edition_detail.html", {
+            "request": request, "edition": None, "hero": None, "posts": [],
+            "stats": {}, "relative_time": _relative_time,
+            "trunc": _truncate_word, "tags": render_tags_html,
+            "excerpt_ok": _excerpt_differs,
+        })
+    items = edition.get("items", [])
+    hero_idx = edition.get("hero_idx", 0)
+    hero = items[hero_idx] if items and hero_idx < len(items) else None
+    rest = [it for i, it in enumerate(items) if i != hero_idx]
+    return templates.TemplateResponse("edition_detail.html", {
+        "request": request,
+        "edition": edition,
+        "hero": hero,
+        "posts": rest,
+        "stats": edition.get("stats", {}),
+        "updated_at": edition.get("created_at"),
+        "relative_time": _relative_time,
+        "trunc": _truncate_word,
+        "tags": render_tags_html,
+        "excerpt_ok": _excerpt_differs,
+    })
+
+
 @router.get("/story/{cluster_id}", response_class=HTMLResponse)
 async def story_page(request: Request, cluster_id: str):
     """Cluster detail page: show all member posts for a story."""

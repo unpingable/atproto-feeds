@@ -337,6 +337,25 @@ def get_state(key: str) -> Optional[str]:
     return row[0] if row else None
 
 
+def get_edition_by_id(edition_id: str) -> Optional[dict]:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT edition_id, created_at, items_json, stats_json, hero_idx "
+        "FROM editions WHERE edition_id = ?",
+        (edition_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "edition_id": row[0],
+        "created_at": row[1],
+        "items": json.loads(row[2]),
+        "stats": json.loads(row[3]),
+        "hero_idx": row[4],
+    }
+
+
 def get_previous_edition(feed_name: str) -> Optional[dict]:
     conn = get_conn()
     rows = conn.execute(

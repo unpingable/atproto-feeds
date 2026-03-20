@@ -94,7 +94,7 @@
 
 {% if editions %}
 {% for ed in editions %}
-<div class="edition-row">
+<a href="/edition/{{ ed.edition_id }}" class="edition-row" style="text-decoration: none; color: inherit;">
     <div>
         <div class="edition-num">#{{ "%04d"|format(ed.edition_num) if ed.edition_num != "?" else ed.edition_id }}</div>
         <span class="edition-time">{{ relative_time(ed.created_at) }}</span>
@@ -115,7 +115,7 @@
         <span>{{ domain }} ({{ count }})</span>
         {% endfor %}
     </div>
-</div>
+</a>
 {% endfor %}
 {% else %}
 <div class="empty-state">

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% set active_page = "archive" %}
+
+{% block title %}{% if edition %}Edition {{ stats.edition_num or edition.edition_id }} — Instant Internet News{% else %}Edition Not Found{% endif %}{% endblock %}
+
+{% block head %}
+<style>
+    .edition-header {
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--rule-heavy);
+    }
+    .edition-header-num {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    .edition-header-time {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+        margin-bottom: 6px;
+    }
+    .edition-header-character {
+        font-family: var(--serif);
+        font-size: 15px;
+        font-style: italic;
+        color: var(--fg-dim);
+    }
+    .edition-header-stats {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-top: 8px;
+    }
+    .edition-items {
+        display: grid;
+        grid-template-columns: 1fr 1px 1fr;
+        gap: 0;
+    }
+    .edition-col {
+        padding: 0 20px;
+    }
+    .edition-col:first-child { padding-left: 0; }
+    .edition-col:last-child { padding-right: 0; }
+    .edition-col-rule {
+        background: linear-gradient(to bottom, var(--rule) 0%, transparent 100%);
+        width: 1px;
+    }
+    .edition-item {
+        margin-bottom: 16px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--border);
+    }
+    .edition-item:last-child { border-bottom: none; }
+    .edition-item-headline {
+        font-family: var(--serif);
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--fg-bright);
+        line-height: 1.32;
+        margin-bottom: 5px;
+    }
+    .edition-item-headline a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .edition-item-headline a:hover { color: var(--accent); }
+    .edition-item-excerpt {
+        font-family: var(--serif);
+        font-size: 13px;
+        color: var(--fg);
+        line-height: 1.5;
+        margin-bottom: 6px;
+    }
+    .edition-item-meta {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--fg-dim);
+    }
+    .edition-item-meta a {
+        color: var(--fg-dim);
+        text-decoration: none;
+    }
+    .edition-item-meta a:hover { color: var(--accent); }
+    .edition-item-domain {
+        display: inline-block;
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 1px 6px;
+        border: 1px solid var(--border-accent);
+        color: var(--accent);
+        border-radius: 2px;
+        text-decoration: none;
+    }
+
+    .edition-lead {
+        padding: 16px 0 20px;
+        margin-bottom: 16px;
+        border-bottom: 3px double var(--rule-heavy);
+    }
+    .edition-lead-headline {
+        font-family: var(--serif);
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--fg-bright);
+        line-height: 1.22;
+        margin-bottom: 10px;
+    }
+    .edition-lead-headline a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .edition-lead-headline a:hover { color: var(--accent); }
+    .edition-lead-excerpt {
+        font-family: var(--serif);
+        font-size: 16px;
+        color: var(--fg);
+        line-height: 1.5;
+        margin-bottom: 10px;
+        max-width: 80%;
+    }
+
+    @media (max-width: 700px) {
+        .edition-items { grid-template-columns: 1fr; }
+        .edition-col-rule { display: none; }
+        .edition-col { padding: 0; margin-bottom: 20px; }
+        .edition-lead-headline { font-size: 20px; }
+        .edition-lead-excerpt { max-width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if edition %}
+<div class="edition-header">
+    <div class="edition-header-num">
+        Edition {% if stats.edition_num %}{{ "%04d"|format(stats.edition_num) }}{% else %}{{ edition.edition_id }}{% endif %}
+    </div>
+    <div class="edition-header-time">{{ relative_time(edition.created_at) }}</div>
+    {% if stats.character %}
+    <div class="edition-header-character">{{ stats.character }}</div>
+    {% endif %}
+    <div class="edition-header-stats">
+        {{ stats.total or 0 }} stories
+        / {{ stats.original_pct or 0 }}% original
+        {% if stats.url_clusters %} / {{ stats.url_clusters }} clusters{% endif %}
+    </div>
+</div>
+
+{% if hero %}
+<article class="edition-lead">
+    <div style="margin-bottom: 8px;">{{ tags(hero.reasons, state=hero.cluster_state if hero.cluster_state is defined else none) }}</div>
+    <h2 class="edition-lead-headline">
+        <a href="{{ hero.web_url }}">{{ trunc(hero.display_headline or hero.text, 120) }}</a>
+    </h2>
+    {% if excerpt_ok(hero.display_headline, hero.text) %}
+    <p class="edition-lead-excerpt">{{ trunc(hero.text, 250) }}</p>
+    {% endif %}
+    <div class="edition-item-meta">
+        <a href="https://bsky.app/profile/{{ hero.author_handle }}">@{{ hero.author_handle }}</a>
+        &middot; {{ relative_time(hero.created_at) }}
+    </div>
+</article>
+{% endif %}
+
+{% if posts %}
+<div class="edition-items">
+    <div class="edition-col">
+        {% for item in posts %}
+        {% if loop.index0 % 2 == 0 %}
+        <article class="edition-item">
+            <div class="edition-item-headline">
+                <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 90) }}</a>
+            </div>
+            {% if excerpt_ok(item.display_headline, item.text) %}
+            <div class="edition-item-excerpt">{{ trunc(item.text, 140) }}</div>
+            {% endif %}
+            <div class="edition-item-meta">
+                <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                &middot; {{ relative_time(item.created_at) }}
+            </div>
+            {% if item.external_uri %}
+            <a class="edition-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
+                {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
+            </a>
+            {% endif %}
+            <div style="margin-top: 5px;">{{ tags(item.reasons, state=item.cluster_state if item.cluster_state is defined else none) }}</div>
+        </article>
+        {% endif %}
+        {% endfor %}
+    </div>
+    <div class="edition-col-rule"></div>
+    <div class="edition-col">
+        {% for item in posts %}
+        {% if loop.index0 % 2 == 1 %}
+        <article class="edition-item">
+            <div class="edition-item-headline">
+                <a href="{{ item.web_url }}">{{ trunc(item.display_headline or item.text, 90) }}</a>
+            </div>
+            {% if excerpt_ok(item.display_headline, item.text) %}
+            <div class="edition-item-excerpt">{{ trunc(item.text, 140) }}</div>
+            {% endif %}
+            <div class="edition-item-meta">
+                <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
+                &middot; {{ relative_time(item.created_at) }}
+            </div>
+            {% if item.external_uri %}
+            <a class="edition-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
+                {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
+            </a>
+            {% endif %}
+            <div style="margin-top: 5px;">{{ tags(item.reasons, state=item.cluster_state if item.cluster_state is defined else none) }}</div>
+        </article>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div style="margin-top: 24px;">
+    <a href="/archive" style="font-family: var(--mono); font-size: 12px; color: var(--accent); text-decoration: none;">&larr; Back to archive</a>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <p>Edition not found.</p>
+    <p style="margin-top: 8px;"><a href="/archive" style="color: var(--accent);">Browse the archive</a></p>
+</div>
+{% endif %}
+{% endblock %}
