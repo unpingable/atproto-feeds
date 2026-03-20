@@ -192,13 +192,33 @@ def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
             score *= vol_mult
             reasons.append(f"volume:{vol_mult:.2f}")
 
-    # Account-level stink penalty
+    # Account-level stink penalty (for graph members with computed stink)
     if author is not None:
         stink = author.get("stink_score", 0)
         if stink > 0.6:
             penalty = (stink - 0.6) * 5.0  # 0.6->0, 0.8->1.0, 1.0->2.0
             score -= penalty
             reasons.append(f"stink:-{penalty:.1f}")
+
+    # Outsider volume penalty: outsider accounts that post prolifically
+    # with the same domain are likely structured relay bots.
+    # Graph members already have stink scores; this catches outsiders.
+    if author is None and has_embed and not platform_link:
+        # Check how many posts this outsider has with this domain
+        author_did = post.get("author_did", "")
+        ext_domain_check = post.get("external_domain", "")
+        if author_did and ext_domain_check:
+            conn = db.get_conn()
+            count_row = conn.execute(
+                "SELECT COUNT(*) FROM posts WHERE author_did = ? AND external_domain = ?",
+                (author_did, ext_domain_check),
+            ).fetchone()
+            conn.close()
+            outsider_domain_posts = count_row[0] if count_row else 0
+            if outsider_domain_posts >= 10:
+                penalty = min((outsider_domain_posts - 10) * 0.2, 4.0)
+                score -= penalty
+                reasons.append(f"outsider_relay:-{penalty:.1f}")
 
     # Per-author weight (editorial taste)
     if author is not None:
