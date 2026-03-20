@@ -2,6 +2,7 @@
 
 import logging
 import math
+import re
 from collections import defaultdict
 
 from . import config, db, timeutil
@@ -9,6 +10,16 @@ from .author_weights import get_author_weight
 from .domains import domain_bonus, is_platform_domain
 
 LOG = logging.getLogger("receipts.rank")
+
+_URL_RE = re.compile(r'https?://\S+|www\.\S+|\S+\.\w{2,4}/\S+')
+
+
+def _strip_urls(text: str) -> str:
+    """Remove URLs and bare domain paths from text to measure actual commentary."""
+    stripped = _URL_RE.sub('', text)
+    # Also strip remaining URL-ish fragments
+    stripped = re.sub(r'\S+\.(com|org|gov|net|io|co|edu|news)/\S*', '', stripped)
+    return stripped.strip()
 
 
 def _flood_penalty(posts_24h: int) -> float:
@@ -136,6 +147,20 @@ def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
     if d_bonus > 0:
         score += d_bonus
         reasons.append(f"domain:{ext_domain}:+{d_bonus}")
+
+    # Relay/exhaust penalty: posts that are just {title} + {url} with minimal commentary
+    # These look source-shaped but add no editorial value
+    text = post.get("text", "")
+    if has_embed and not platform_link:
+        non_url_text = _strip_urls(text)
+        if len(non_url_text) < 20:
+            # Nearly pure link dump — heavy penalty
+            score -= 3.0
+            reasons.append("relay:-3")
+        elif len(non_url_text) < 60 and not reply_to and not quote:
+            # Short text + link, no conversation — mild penalty
+            score -= 1.5
+            reasons.append("low_commentary:-1.5")
 
     # Image-only stub penalty: image post with minimal text and no real link
     has_image = post.get("has_image", 0) or post.get("has_video", 0)
