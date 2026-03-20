@@ -437,6 +437,93 @@ async def homepage(request: Request):
     })
 
 
+@router.get("/archive", response_class=HTMLResponse)
+async def archive(request: Request):
+    editions = db.get_recent_editions("receipts", limit=20)
+    # Build summaries for each edition
+    summaries = []
+    for ed in editions:
+        stats = ed.get("stats", {})
+        items = ed.get("items", [])
+        hero_idx = ed.get("hero_idx", 0)
+        hero = items[hero_idx] if items and hero_idx < len(items) else None
+        hero_headline = ""
+        if hero:
+            h = hero.get("display_headline", "") or hero.get("text", "")
+            hero_headline = _truncate_word(h, 80)
+        # Top domains
+        top_domains = stats.get("top_domains", [])[:3]
+        summaries.append({
+            "edition_id": ed["edition_id"],
+            "created_at": ed["created_at"],
+            "edition_num": stats.get("edition_num", "?"),
+            "total": stats.get("total", 0),
+            "original_pct": stats.get("original_pct", 0),
+            "url_clusters": stats.get("url_clusters", 0),
+            "hero_headline": hero_headline,
+            "top_domains": top_domains,
+        })
+    return templates.TemplateResponse("archive.html", {
+        "request": request,
+        "editions": summaries,
+        "relative_time": _relative_time,
+    })
+
+
+@router.get("/story/{cluster_id}", response_class=HTMLResponse)
+async def story_page(request: Request, cluster_id: str):
+    """Cluster detail page: show all member posts for a story."""
+    conn = db.get_conn()
+    cluster_row = conn.execute(
+        "SELECT * FROM story_clusters WHERE cluster_id = ?", (cluster_id,)
+    ).fetchone()
+    if not cluster_row:
+        conn.close()
+        return templates.TemplateResponse("story.html", {
+            "request": request,
+            "cluster": None,
+            "members": [],
+            "relative_time": _relative_time,
+            "trunc": _truncate_word,
+            "tags": render_tags_html,
+        })
+    cluster = dict(cluster_row)
+
+    # Get member posts
+    member_rows = conn.execute(
+        "SELECT post_uri, author_did, post_score, is_lead FROM cluster_members "
+        "WHERE cluster_id = ? ORDER BY post_score DESC",
+        (cluster_id,),
+    ).fetchall()
+    conn.close()
+
+    # Hydrate member posts
+    member_uris = [r[0] for r in member_rows]
+    hydrated = hydrate_posts(member_uris)
+
+    members = []
+    for row in member_rows:
+        h = hydrated.get(row[0])
+        if not h:
+            continue
+        raw_headline = h.get("display_headline", "") or h.get("text", "")
+        h["display_headline"] = _clean_headline(raw_headline) or raw_headline
+        members.append({
+            **h,
+            "score": row[2],
+            "is_lead": row[3],
+        })
+
+    return templates.TemplateResponse("story.html", {
+        "request": request,
+        "cluster": cluster,
+        "members": members,
+        "relative_time": _relative_time,
+        "trunc": _truncate_word,
+        "tags": render_tags_html,
+    })
+
+
 @router.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
     return templates.TemplateResponse("about.html", {"request": request})

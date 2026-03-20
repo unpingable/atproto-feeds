@@ -90,10 +90,26 @@ def reasons_to_tags(reasons: list, max_tags: int = 4) -> list[dict]:
     return tags
 
 
-def render_tags_html(reasons: list, max_tags: int = 4) -> str:
-    """Render reason tags as HTML spans. Returns safe markup."""
-    tags = reasons_to_tags(reasons, max_tags)
+STATE_TAGS = {
+    "emerging": ("state-emerging", "emerging"),
+    "persistent": ("state-persistent", "persistent"),
+    "fading": ("state-fading", "fading"),
+}
+
+
+def render_tags_html(reasons: list, max_tags: int = 4, state: str = None) -> str:
+    """Render reason tags as HTML spans. Returns safe markup.
+
+    Optionally prepends a cluster state tag (emerging/persistent/fading).
+    Active state is not shown — it's the default, no need to label it.
+    """
     parts = []
+    # State tag first if notable
+    if state and state in STATE_TAGS:
+        css, label = STATE_TAGS[state]
+        parts.append(f'<span class="reason-tag {css}">{label}</span>')
+
+    tags = reasons_to_tags(reasons, max_tags - (1 if parts else 0))
     for tag in tags:
         parts.append(f'<span class="reason-tag {tag["css"]}">{tag["label"]}</span>')
     return Markup(" ".join(parts))

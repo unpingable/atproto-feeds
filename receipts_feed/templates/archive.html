@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% set active_page = "archive" %}
+
+{% block title %}Archive — Instant Internet News{% endblock %}
+
+{% block head %}
+<style>
+    .archive-intro {
+        max-width: 600px;
+        margin-bottom: 24px;
+    }
+    .archive-intro p {
+        font-family: var(--serif);
+        font-size: 16px;
+        color: var(--fg);
+        line-height: 1.55;
+    }
+    .archive-note {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-dim);
+        font-style: italic;
+        margin-bottom: 24px;
+    }
+
+    .edition-row {
+        display: grid;
+        grid-template-columns: 90px 1fr auto;
+        gap: 16px;
+        align-items: baseline;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .edition-row:last-child { border-bottom: none; }
+    .edition-num {
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--accent);
+    }
+    .edition-time {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--fg-dim);
+        display: block;
+        margin-top: 2px;
+    }
+    .edition-hero {
+        font-family: var(--serif);
+        font-size: 15px;
+        color: var(--fg-bright);
+        line-height: 1.35;
+        margin-bottom: 4px;
+    }
+    .edition-meta {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--fg-dim);
+    }
+    .edition-domains {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--fg-dim);
+        text-align: right;
+        white-space: nowrap;
+    }
+    .edition-domains span {
+        display: block;
+    }
+
+    @media (max-width: 600px) {
+        .edition-row {
+            grid-template-columns: 1fr;
+            gap: 4px;
+        }
+        .edition-domains { text-align: left; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Archive</h1>
+<p class="page-subtitle">Recent editions, frozen every 15 minutes.</p>
+
+<div class="archive-intro">
+    <p>
+        Each edition is a snapshot of the ranked, clustered, and composed
+        front page at a point in time. The engine runs continuously; the
+        editions are when it publishes.
+    </p>
+</div>
+
+<hr class="rule">
+
+{% if editions %}
+{% for ed in editions %}
+<div class="edition-row">
+    <div>
+        <div class="edition-num">#{{ "%04d"|format(ed.edition_num) if ed.edition_num != "?" else ed.edition_id }}</div>
+        <span class="edition-time">{{ relative_time(ed.created_at) }}</span>
+    </div>
+    <div>
+        {% if ed.hero_headline %}
+        <div class="edition-hero">{{ ed.hero_headline }}</div>
+        {% endif %}
+        <div class="edition-meta">
+            {{ ed.total }} stories
+            / {{ ed.original_pct }}% original
+            {% if ed.url_clusters %} / {{ ed.url_clusters }} clusters{% endif %}
+        </div>
+    </div>
+    <div class="edition-domains">
+        {% for domain, count in ed.top_domains %}
+        <span>{{ domain }} ({{ count }})</span>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+    <p>No archived editions yet.</p>
+</div>
+{% endif %}
+{% endblock %}

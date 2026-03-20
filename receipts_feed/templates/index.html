@@ -10,27 +10,31 @@
 
     /* --- Lead story --- */
     .lead {
-        padding: 20px 0 16px;
+        padding: 24px 0 20px;
+        margin: 0 0 4px;
+        border-bottom: none;
     }
     .lead-kicker {
         font-family: var(--mono);
-        font-size: 11px;
+        font-size: 10px;
         color: var(--accent);
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        margin-bottom: 6px;
+        margin-bottom: 10px;
     }
     .lead-headline {
         font-family: var(--serif);
-        font-size: 28px;
+        font-size: 30px;
         font-weight: 600;
         color: var(--fg-bright);
-        line-height: 1.25;
-        margin-bottom: 8px;
+        line-height: 1.22;
+        margin-bottom: 12px;
+        max-width: 85%;
     }
     .lead-headline a {
         color: inherit;
         text-decoration: none;
+        transition: color 0.15s;
     }
     .lead-headline a:hover {
         color: var(--accent);
@@ -40,23 +44,25 @@
         font-size: 17px;
         color: var(--fg);
         line-height: 1.55;
-        margin-bottom: 10px;
+        margin-bottom: 14px;
+        max-width: 75%;
     }
     .lead-byline {
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: 11px;
         color: var(--fg-dim);
     }
     .lead-byline a {
         color: var(--fg-dim);
         text-decoration: none;
+        transition: color 0.15s;
     }
     .lead-byline a:hover { color: var(--accent); }
     .lead-reasons {
         display: flex;
         gap: 5px;
         flex-wrap: wrap;
-        margin-top: 8px;
+        margin-top: 10px;
     }
 
     /* --- Broadsheet grid --- */
@@ -64,14 +70,14 @@
         display: grid;
         grid-template-columns: 1fr 1px 1fr 1px 1fr;
         gap: 0;
-        padding-top: 16px;
+        padding-top: 20px;
     }
     .col-rule {
-        background: var(--rule);
+        background: linear-gradient(to bottom, var(--rule) 0%, transparent 100%);
         width: 1px;
     }
     .broadsheet-col {
-        padding: 0 18px;
+        padding: 0 20px;
     }
     .broadsheet-col:first-child { padding-left: 0; }
     .broadsheet-col:last-child { padding-right: 0; }
@@ -79,42 +85,49 @@
     /* --- Column section headers --- */
     .col-header {
         font-family: var(--mono);
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 500;
         color: var(--accent);
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        padding-bottom: 8px;
-        margin-bottom: 12px;
+        padding-bottom: 10px;
+        margin-bottom: 14px;
         border-bottom: 1px solid var(--border);
     }
 
     /* --- Column items --- */
     .col-item {
-        margin-bottom: 18px;
-        padding-bottom: 16px;
+        margin-bottom: 16px;
+        padding-bottom: 14px;
         border-bottom: 1px solid var(--border);
     }
     .col-item:last-child {
         border-bottom: none;
         margin-bottom: 0;
     }
+    /* First item in each column gets more visual weight */
+    .col-item:first-of-type .col-item-headline {
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 1.28;
+    }
     .col-item-headline {
         font-family: var(--serif);
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 500;
         color: var(--fg-bright);
-        line-height: 1.3;
-        margin-bottom: 4px;
+        line-height: 1.32;
+        margin-bottom: 5px;
     }
     .col-item-headline a {
         color: inherit;
         text-decoration: none;
+        transition: color 0.15s;
     }
     .col-item-headline a:hover { color: var(--accent); }
     .col-item-excerpt {
         font-family: var(--serif);
-        font-size: 14px;
+        font-size: 13px;
         color: var(--fg);
         line-height: 1.5;
         margin-bottom: 6px;
@@ -125,8 +138,9 @@
     }
     .col-item-meta {
         font-family: var(--mono);
-        font-size: 11px;
+        font-size: 10px;
         color: var(--fg-dim);
+        line-height: 1.6;
     }
     .col-item-meta a {
         color: var(--fg-dim);
@@ -136,13 +150,14 @@
     .col-item-domain {
         font-family: var(--mono);
         font-size: 10px;
-        padding: 1px 5px;
+        padding: 1px 6px;
         border: 1px solid var(--border-accent);
         color: var(--accent);
         border-radius: 2px;
         text-decoration: none;
         display: inline-block;
-        margin-top: 4px;
+        margin-top: 5px;
+        transition: border-color 0.15s;
     }
     .col-item-domain:hover { border-color: var(--accent); }
     .col-item-reasons {
@@ -163,17 +178,18 @@
         background: var(--bg-raised);
         border: 1px solid var(--border);
         border-left: 3px solid var(--accent-dim);
-        padding: 12px 14px;
-        margin-bottom: 18px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        border-radius: 0 2px 2px 0;
     }
     .docket-title {
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
         color: var(--accent);
-        letter-spacing: 0.04em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
     }
     .docket-subtitle {
         font-family: var(--mono);
@@ -185,27 +201,29 @@
         font-family: var(--serif);
         font-size: 13px;
         color: var(--fg);
-        line-height: 1.4;
-        padding: 3px 0;
+        line-height: 1.45;
+        padding: 4px 0;
         border-bottom: 1px dotted var(--border);
     }
     .docket-member:last-child { border-bottom: none; }
     .docket-member a {
         color: var(--fg);
         text-decoration: none;
+        transition: color 0.15s;
     }
     .docket-member a:hover { color: var(--accent); }
 
     /* --- Marginalia (house ads / notices) --- */
     .marginalia-block {
-        margin-top: 4px;
+        margin-top: 8px;
+        padding-top: 4px;
     }
     .marginalia-label {
         font-family: var(--mono);
         font-size: 9px;
         font-weight: 500;
         color: var(--fg-dim);
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
         padding-bottom: 6px;
         margin-bottom: 10px;
@@ -213,19 +231,19 @@
     }
     .marginalia-item {
         font-family: var(--serif);
-        font-size: 13px;
+        font-size: 12px;
         color: var(--fg-dim);
         line-height: 1.5;
         padding: 10px 12px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         background: var(--bg-inset);
         border-left: 2px solid var(--border);
     }
     .marginalia-item strong {
         font-family: var(--mono);
-        font-size: 10px;
+        font-size: 9px;
         color: var(--accent-dim);
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
         display: block;
         margin-bottom: 3px;
     }
@@ -240,24 +258,24 @@
     .marginalia-item a:hover { border-bottom-color: var(--accent); }
     .marginalia-footer {
         font-family: var(--mono);
-        font-size: 9px;
+        font-size: 8px;
         color: var(--fg-dim);
         font-style: italic;
-        margin-top: 6px;
+        margin-top: 4px;
     }
 
     /* --- Below the fold --- */
     .below-fold {
-        padding-top: 6px;
+        padding-top: 8px;
     }
     .fold-label {
         font-family: var(--mono);
-        font-size: 10px;
+        font-size: 9px;
         color: var(--fg-dim);
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
         text-align: center;
-        padding: 6px 0;
+        padding: 8px 0;
     }
     .wire-grid {
         display: grid;
@@ -273,24 +291,29 @@
 
     /* --- Sidebar stats (in 3rd column) --- */
     .sidebar-block {
-        margin-bottom: 20px;
+        margin-bottom: 18px;
+        padding-bottom: 4px;
+    }
+    .sidebar-block + .sidebar-block {
+        border-top: 1px solid var(--border);
+        padding-top: 14px;
     }
     .sidebar-title {
         font-family: var(--mono);
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 500;
         color: var(--accent);
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
         padding-bottom: 6px;
         margin-bottom: 8px;
-        border-bottom: 1px solid var(--border);
     }
     .sidebar-stat {
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: 11px;
         color: var(--fg-dim);
-        margin-bottom: 4px;
+        margin-bottom: 3px;
+        line-height: 1.5;
     }
     .sidebar-stat strong {
         color: var(--fg);
@@ -300,7 +323,7 @@
         display: flex;
         justify-content: space-between;
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: 11px;
         color: var(--fg-dim);
         padding: 3px 0;
         border-bottom: 1px dotted var(--border);
@@ -315,27 +338,27 @@
     .section-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        padding: 16px 0 8px;
+        gap: 1px;
+        padding: 0;
+        background: var(--border);
+        border: 1px solid var(--border);
     }
     .section-card {
         display: block;
-        padding: 14px 16px;
-        background: var(--bg-raised);
-        border: 1px solid var(--border);
-        border-radius: 3px;
+        padding: 16px 18px;
+        background: var(--bg);
         text-decoration: none;
-        transition: border-color 0.15s;
+        transition: background 0.15s;
     }
     .section-card:hover {
-        border-color: var(--accent-dim);
+        background: var(--bg-raised);
     }
     .section-card-title {
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
         color: var(--accent);
-        letter-spacing: 0.04em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         margin-bottom: 4px;
     }
@@ -343,7 +366,7 @@
         font-family: var(--serif);
         font-size: 13px;
         color: var(--fg-dim);
-        line-height: 1.4;
+        line-height: 1.45;
     }
 
     /* --- Responsive --- */
@@ -354,15 +377,28 @@
             gap: 0;
         }
         .col-rule { display: none; }
-        .broadsheet-col { padding: 0; margin-bottom: 20px; }
-        .wire-grid {
-            grid-template-columns: 1fr;
+        .broadsheet-col {
+            padding: 0;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
         }
+        .broadsheet-col:last-child { border-bottom: none; }
+        .wire-grid { grid-template-columns: 1fr; }
         .wire-col { padding: 0; }
-        .lead-headline { font-size: 22px; }
+        .lead-headline {
+            font-size: 24px;
+            max-width: 100%;
+        }
+        .lead-excerpt { max-width: 100%; }
+        .col-item:first-of-type .col-item-headline {
+            font-size: 16px;
+        }
     }
     @media (max-width: 480px) {
         .section-grid { grid-template-columns: 1fr; }
+        .nameplate h1 { font-size: 32px; }
+        .lead-headline { font-size: 22px; }
     }
 </style>
 {% endblock %}
@@ -407,7 +443,7 @@
         {% set lead = hero %}
         {% if lead %}
         <article class="lead">
-            <div class="lead-kicker">{{ tags(lead.reasons, 3) }}</div>
+            <div class="lead-kicker">{{ tags(lead.reasons, 3, state=lead.cluster_state if lead.cluster_state is defined else none) }}</div>
             <h2 class="lead-headline">
                 <a href="{{ lead.web_url }}">
                     {%- if lead.display_headline %}{{ trunc(lead.display_headline, 140) }}
@@ -425,7 +461,7 @@
                 &middot; <a class="col-item-domain" href="{{ lead.external_uri }}" target="_blank" rel="noopener">{{ lead.external_uri | replace("https://", "") | replace("http://", "") | truncate(50, True, "...") }}</a>
                 {% endif %}
             </div>
-            <div class="lead-reasons">{{ tags(lead.reasons) }}</div>
+            <div class="lead-reasons">{{ tags(lead.reasons, state=lead.cluster_state if lead.cluster_state is defined else none) }}</div>
         </article>
         {% endif %}
 
@@ -497,14 +533,14 @@
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
                         {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                         &middot; {{ relative_time(item.created_at) }}
-                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts / {{ item.unique_authors }} authors{% if item.cluster_state == "persistent" %} / persistent{% endif %}</span>{% endif %}
+                        {% if item.post_count and item.post_count > 1 %}<a href="/story/{{ item.cluster_id }}" class="cluster-badge" style="text-decoration:none;">{{ item.post_count }} posts / {{ item.unique_authors }} authors{% if item.cluster_state == "persistent" %} / persistent{% endif %}</a>{% endif %}
                     </div>
                     {% if item.external_uri %}
                     <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
                         {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
                     </a>
                     {% endif %}
-                    <div class="col-item-reasons">{{ tags(item.reasons) }}</div>
+                    <div class="col-item-reasons">{{ tags(item.reasons, state=item.cluster_state if item.cluster_state is defined else none) }}</div>
                 </article>
                 {% endif %}
                 {% endfor %}
@@ -527,14 +563,14 @@
                         <a href="https://bsky.app/profile/{{ item.author_handle }}">@{{ item.author_handle }}</a>
                         {% if item.langs and "en" not in item.langs %}<span class="lang-badge">{{ item.langs[0] }}</span>{% endif %}
                         &middot; {{ relative_time(item.created_at) }}
-                        {% if item.post_count and item.post_count > 1 %}<span class="cluster-badge">{{ item.post_count }} posts / {{ item.unique_authors }} authors{% if item.cluster_state == "persistent" %} / persistent{% endif %}</span>{% endif %}
+                        {% if item.post_count and item.post_count > 1 %}<a href="/story/{{ item.cluster_id }}" class="cluster-badge" style="text-decoration:none;">{{ item.post_count }} posts / {{ item.unique_authors }} authors{% if item.cluster_state == "persistent" %} / persistent{% endif %}</a>{% endif %}
                     </div>
                     {% if item.external_uri %}
                     <a class="col-item-domain" href="{{ item.external_uri }}" target="_blank" rel="noopener">
                         {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(40, True, "...") }}
                     </a>
                     {% endif %}
-                    <div class="col-item-reasons">{{ tags(item.reasons) }}</div>
+                    <div class="col-item-reasons">{{ tags(item.reasons, state=item.cluster_state if item.cluster_state is defined else none) }}</div>
                 </article>
                 {% endfor %}
             </div>
@@ -613,7 +649,7 @@
                             {{ item.external_uri | replace("https://", "") | replace("http://", "") | truncate(35, True, "...") }}
                         </a>
                         {% endif %}
-                        <div class="col-item-reasons" style="margin-top:4px;">{{ tags(item.reasons, 3) }}</div>
+                        <div class="col-item-reasons" style="margin-top:4px;">{{ tags(item.reasons, 3, state=item.cluster_state if item.cluster_state is defined else none) }}</div>
                     </article>
                     {% endif %}
                     {% endfor %}

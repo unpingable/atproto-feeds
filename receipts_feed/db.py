@@ -342,6 +342,27 @@ def get_previous_edition(feed_name: str) -> Optional[dict]:
     }
 
 
+def get_recent_editions(feed_name: str, limit: int = 7) -> list[dict]:
+    """Get the N most recent editions for the archive page."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT edition_id, created_at, items_json, stats_json, hero_idx "
+        "FROM editions WHERE feed_name = ? ORDER BY created_at DESC LIMIT ?",
+        (feed_name, limit),
+    ).fetchall()
+    conn.close()
+    return [
+        {
+            "edition_id": r[0],
+            "created_at": r[1],
+            "items": json.loads(r[2]),
+            "stats": json.loads(r[3]),
+            "hero_idx": r[4],
+        }
+        for r in rows
+    ]
+
+
 def purge_old_posts(hours: int = 48):
     conn = get_conn()
     cutoff = (timeutil.now_utc() - __import__("datetime").timedelta(hours=hours)).isoformat()

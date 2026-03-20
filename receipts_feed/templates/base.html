@@ -29,23 +29,25 @@
     <style>
         :root {
             --bg: #0c0c0e;
-            --bg-raised: #141418;
+            --bg-raised: #131317;
             --bg-inset: #0a0a0c;
+            --bg-hero: #0f0f12;
             --fg: #c8c5be;
             --fg-dim: #6e6b63;
             --fg-bright: #e8e5dd;
             --accent: #b8a47a;
             --accent-dim: #7a6f52;
+            --accent-glow: rgba(184, 164, 122, 0.06);
             --tag-mutual: #5b7a5e;
             --tag-original: #5a6e80;
             --tag-source: #8a6a4a;
             --tag-link: #6a5a7a;
             --tag-substance: #5a6a6a;
             --tag-penalty: #7a4a4a;
-            --border: #2a2a2e;
+            --border: #22222a;
             --border-accent: #3a3530;
-            --rule: #3a3a3e;
-            --rule-heavy: #4a4a4e;
+            --rule: #2e2e34;
+            --rule-heavy: #40404a;
             --mono: 'DM Mono', 'Menlo', monospace;
             --serif: 'Newsreader', 'Georgia', serif;
         }
@@ -59,6 +61,7 @@
             line-height: 1.6;
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
         }
 
         .wrap {
@@ -75,7 +78,7 @@
         /* --- Nameplate --- */
         .nameplate {
             text-align: center;
-            padding: 24px 0 0;
+            padding: 28px 0 0;
         }
         .nameplate-rule {
             border: none;
@@ -89,12 +92,12 @@
         }
         .nameplate h1 {
             font-family: var(--serif);
-            font-size: 42px;
+            font-size: 46px;
             font-weight: 700;
             color: var(--fg-bright);
-            letter-spacing: 0.01em;
-            line-height: 1.1;
-            padding: 14px 0;
+            letter-spacing: -0.005em;
+            line-height: 1.05;
+            padding: 16px 0 6px;
         }
         .nameplate h1 a {
             color: inherit;
@@ -102,11 +105,11 @@
         }
         .nameplate-sub {
             font-family: var(--mono);
-            font-size: 11px;
+            font-size: 10px;
             color: var(--fg-dim);
-            letter-spacing: 0.12em;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
-            padding-bottom: 10px;
+            padding-bottom: 12px;
         }
 
         /* --- Dateline bar --- */
@@ -114,11 +117,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
+            padding: 10px 0;
             font-family: var(--mono);
-            font-size: 11px;
+            font-size: 10px;
             color: var(--fg-dim);
-            letter-spacing: 0.03em;
+            letter-spacing: 0.04em;
         }
         .dateline-bar a {
             color: var(--fg-dim);
@@ -219,6 +222,9 @@
         .reason-tag.link { background: #282838; color: #9898b8; }
         .reason-tag.substance { background: #1e2e2e; color: #7eb8b0; }
         .reason-tag.default { background: var(--bg-raised); color: var(--fg-dim); border: 1px solid var(--border); }
+        .reason-tag.state-emerging { background: #2a2a18; color: #c8b860; border: 1px solid #4a4020; }
+        .reason-tag.state-persistent { background: #1a2a2a; color: #60b8a8; border: 1px solid #204a40; }
+        .reason-tag.state-fading { background: #1a1a20; color: #8080a0; font-style: italic; }
         .lang-badge {
             font-family: var(--mono);
             font-size: 9px;
@@ -311,7 +317,8 @@
         /* --- Footer --- */
         footer {
             border-top: 2px solid var(--rule-heavy);
-            padding: 16px 0 40px;
+            padding: 20px 0 48px;
+            margin-top: 8px;
         }
         .footer-inner {
             display: flex;

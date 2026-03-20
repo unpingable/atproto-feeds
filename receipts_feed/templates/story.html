@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% set active_page = "" %}
+
+{% block title %}{% if cluster %}Story — Instant Internet News{% else %}Story Not Found{% endif %}{% endblock %}
+
+{% block head %}
+<style>
+    .story-header {
+        margin-bottom: 24px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid var(--rule-heavy);
+    }
+    .story-type {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+    .story-meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-top: 12px;
+    }
+    .story-stat {
+        display: inline-block;
+        margin-right: 16px;
+    }
+    .story-stat strong {
+        color: var(--fg);
+    }
+
+    .story-grid {
+        display: grid;
+        grid-template-columns: 1fr 1px 300px;
+        gap: 0;
+    }
+    .story-main {
+        padding-right: 24px;
+    }
+    .story-sidebar {
+        padding-left: 24px;
+    }
+    .story-col-rule {
+        background: var(--rule);
+        width: 1px;
+    }
+
+    .member-post {
+        padding: 18px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .member-post:last-child { border-bottom: none; }
+    .member-post.is-lead {
+        padding-bottom: 24px;
+        margin-bottom: 4px;
+    }
+    .member-lead-badge {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+    .member-headline {
+        font-family: var(--serif);
+        font-size: 17px;
+        font-weight: 500;
+        color: var(--fg-bright);
+        line-height: 1.35;
+        margin-bottom: 8px;
+    }
+    .member-headline a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .member-headline a:hover { color: var(--accent); }
+    .member-post.is-lead .member-headline {
+        font-size: 20px;
+        font-weight: 600;
+    }
+    .member-text {
+        font-family: var(--serif);
+        font-size: 15px;
+        color: var(--fg);
+        line-height: 1.55;
+        margin-bottom: 8px;
+    }
+    .member-meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-dim);
+    }
+    .member-meta a {
+        color: var(--fg-dim);
+        text-decoration: none;
+    }
+    .member-meta a:hover { color: var(--accent); }
+    .member-domain {
+        display: inline-block;
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 1px 6px;
+        border: 1px solid var(--border-accent);
+        color: var(--accent);
+        border-radius: 2px;
+        text-decoration: none;
+    }
+    .member-domain:hover { border-color: var(--accent); }
+
+    .sidebar-info {
+        margin-bottom: 20px;
+    }
+    .sidebar-info-title {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+    .sidebar-info-row {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-bottom: 4px;
+    }
+    .sidebar-info-row strong {
+        color: var(--fg);
+    }
+
+    @media (max-width: 800px) {
+        .story-grid { grid-template-columns: 1fr; }
+        .story-col-rule { display: none; }
+        .story-main { padding-right: 0; }
+        .story-sidebar {
+            padding-left: 0;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            margin-top: 12px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if cluster %}
+<div class="story-header">
+    <div class="story-type">
+        {% if cluster.cluster_type == "url" %}URL Cluster
+        {% elif cluster.cluster_type == "root" %}Thread Cluster
+        {% else %}Story{% endif %}
+        {% if cluster.state and cluster.state != "active" %}
+        &middot; {{ cluster.state }}
+        {% endif %}
+    </div>
+    <h1 class="page-title" style="font-style: normal;">
+        {% if members and members[0].display_headline %}
+        {{ trunc(members[0].display_headline, 120) }}
+        {% elif cluster.canonical_url %}
+        {{ cluster.canonical_url | replace("https://", "") | replace("http://", "") | truncate(80, True, "...") }}
+        {% else %}
+        Story {{ cluster.cluster_id }}
+        {% endif %}
+    </h1>
+    <div class="story-meta">
+        <span class="story-stat"><strong>{{ cluster.post_count }}</strong> posts</span>
+        <span class="story-stat"><strong>{{ cluster.unique_authors }}</strong> authors</span>
+        <span class="story-stat"><strong>{{ cluster.editions_present }}</strong> editions</span>
+        {% if cluster.domain %}<span class="story-stat">{{ cluster.domain }}</span>{% endif %}
+    </div>
+</div>
+
+<div class="story-grid">
+    <div class="story-main">
+        {% for member in members %}
+        <article class="member-post {% if member.is_lead %}is-lead{% endif %}">
+            {% if member.is_lead %}
+            <div class="member-lead-badge">Lead Post</div>
+            {% endif %}
+            <div class="member-headline">
+                <a href="{{ member.web_url }}">{{ trunc(member.display_headline or member.text, 120) }}</a>
+            </div>
+            {% if member.text|length > 40 %}
+            <div class="member-text">{{ trunc(member.text, 300) }}</div>
+            {% endif %}
+            <div class="member-meta">
+                <a href="https://bsky.app/profile/{{ member.author_handle }}">@{{ member.author_handle }}</a>
+                &middot; {{ relative_time(member.created_at) }}
+                {% if member.like_count %}&middot; {{ member.like_count }} likes{% endif %}
+                {% if member.reply_count %}&middot; {{ member.reply_count }} replies{% endif %}
+            </div>
+            {% if member.external_uri %}
+            <a class="member-domain" href="{{ member.external_uri }}" target="_blank" rel="noopener">
+                {{ member.external_uri | replace("https://", "") | replace("http://", "") | truncate(50, True, "...") }}
+            </a>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+
+    <div class="story-col-rule"></div>
+
+    <div class="story-sidebar">
+        <div class="sidebar-info">
+            <div class="sidebar-info-title">Cluster Info</div>
+            <div class="sidebar-info-row">Type: <strong>{{ cluster.cluster_type }}</strong></div>
+            <div class="sidebar-info-row">State: <strong>{{ cluster.state }}</strong></div>
+            <div class="sidebar-info-row">First seen: <strong>{{ relative_time(cluster.first_seen_at) }}</strong></div>
+            <div class="sidebar-info-row">Last seen: <strong>{{ relative_time(cluster.last_seen_at) }}</strong></div>
+            <div class="sidebar-info-row">Editions: <strong>{{ cluster.editions_present }}</strong></div>
+        </div>
+        {% if cluster.canonical_url %}
+        <div class="sidebar-info">
+            <div class="sidebar-info-title">Source URL</div>
+            <div style="word-break: break-all;">
+                <a href="{{ cluster.canonical_url }}" target="_blank" rel="noopener"
+                   style="font-family: var(--mono); font-size: 11px; color: var(--accent); text-decoration: none;">
+                    {{ cluster.canonical_url | replace("https://", "") | replace("http://", "") }}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        <div class="sidebar-info">
+            <div class="sidebar-info-title">Authors</div>
+            {% set seen_authors = [] %}
+            {% for member in members %}
+            {% if member.author_handle not in seen_authors %}
+            {% set _ = seen_authors.append(member.author_handle) %}
+            <div class="sidebar-info-row">
+                <a href="https://bsky.app/profile/{{ member.author_handle }}"
+                   style="color: var(--fg); text-decoration: none;">@{{ member.author_handle }}</a>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <p>Story not found or no longer tracked.</p>
+</div>
+{% endif %}
+{% endblock %}
