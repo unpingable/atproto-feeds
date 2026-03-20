@@ -131,7 +131,8 @@ async def shutdown():
 # -- Feed skeleton endpoint --
 
 FEED_URIS = {
-    "receipts": True,
+    "receipts": "live",       # Live post-level ranking with dedup
+    "edition": "edition",     # Frozen edition — cluster-level, cleaner
 }
 
 
@@ -149,6 +150,29 @@ async def get_feed_skeleton(
             content={"error": "UnknownFeed", "message": f"Unknown feed: {feed_name}"},
         )
 
+    feed_mode = FEED_URIS[feed_name]
+
+    if feed_mode == "edition":
+        # Edition feed: serve from frozen edition (cluster-level, cleaner)
+        edition = db.get_latest_edition("receipts")
+        if not edition:
+            return {"cursor": None, "feed": []}
+        items = edition.get("items", [])
+        # Filter out docket cards (not real posts)
+        post_items = [item for item in items if not item.get("is_docket")]
+        # Apply cursor (index-based for edition)
+        start = 0
+        if cursor:
+            try:
+                start = int(cursor)
+            except ValueError:
+                pass
+        page = post_items[start:start + limit]
+        feed_items = [{"post": item["uri"]} for item in page if item.get("uri")]
+        next_cursor = str(start + limit) if start + limit < len(post_items) else None
+        return {"cursor": next_cursor, "feed": feed_items}
+
+    # Live feed: post-level ranking with dedup
     cursor_score = None
     if cursor:
         try:
@@ -160,7 +184,7 @@ async def get_feed_skeleton(
             )
 
     # Fetch extra to account for dedup filtering
-    ranked = db.get_ranked_posts(feed_name, limit=limit * 2, cursor_score=cursor_score)
+    ranked = db.get_ranked_posts("receipts", limit=limit * 2, cursor_score=cursor_score)
 
     # Apply cluster dedup + light docket suppression
     ranked = dedup_feed(ranked, limit=limit)
