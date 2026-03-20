@@ -32,9 +32,24 @@ def init_db():
             seed_class TEXT,
             trusted_score REAL DEFAULT 0,
             posts_24h INTEGER DEFAULT 0,
-            updated_at TEXT
+            updated_at TEXT,
+            stink_score REAL DEFAULT 0,
+            link_post_ratio REAL DEFAULT 0,
+            reply_ratio REAL DEFAULT 0,
+            avg_non_url_len REAL DEFAULT 0
         )
     """)
+    # Migration for existing DBs
+    for col, typedef in [
+        ("stink_score", "REAL DEFAULT 0"),
+        ("link_post_ratio", "REAL DEFAULT 0"),
+        ("reply_ratio", "REAL DEFAULT 0"),
+        ("avg_non_url_len", "REAL DEFAULT 0"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE authors ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS posts (
@@ -361,6 +376,84 @@ def get_recent_editions(feed_name: str, limit: int = 7) -> list[dict]:
         }
         for r in rows
     ]
+
+
+def compute_author_stink_scores():
+    """Compute account-level stink scores from recent posting behavior.
+
+    Stink score = how relay/exhaust-shaped is this account's behavior.
+    Higher = more likely a syndication bot. Range 0-1.
+    """
+    import re
+    url_re = re.compile(r'https?://\S+|www\.\S+|\S+\.\w{2,4}/\S+')
+
+    conn = get_conn()
+    cutoff = (timeutil.now_utc() - __import__("datetime").timedelta(days=7)).isoformat()
+
+    # Get all authors with recent posts
+    authors = conn.execute("SELECT DISTINCT author_did FROM posts WHERE created_at >= ?", (cutoff,)).fetchall()
+
+    for (did,) in authors:
+        rows = conn.execute(
+            "SELECT text, has_external_embed, reply_to_uri, quote_uri, external_domain "
+            "FROM posts WHERE author_did = ? AND created_at >= ?",
+            (did, cutoff),
+        ).fetchall()
+
+        total = len(rows)
+        if total < 3:
+            continue  # Not enough data
+
+        link_posts = sum(1 for r in rows if r[1])  # has_external_embed
+        reply_posts = sum(1 for r in rows if r[2])  # reply_to_uri
+        quote_posts = sum(1 for r in rows if r[3])  # quote_uri
+
+        # Non-URL text lengths
+        non_url_lens = []
+        title_url_count = 0
+        domains = []
+        for r in rows:
+            text = r[0] or ""
+            stripped = url_re.sub("", text)
+            stripped = re.sub(r'\S+\.(com|org|gov|net|io|co|edu|news)/\S*', '', stripped).strip()
+            non_url_lens.append(len(stripped))
+            if r[1] and len(stripped) < 30:  # link post with little commentary
+                title_url_count += 1
+            if r[4]:
+                domains.append(r[4])
+
+        link_post_ratio = link_posts / total if total else 0
+        reply_ratio = (reply_posts + quote_posts) / total if total else 0
+        avg_non_url_len = sum(non_url_lens) / total if total else 0
+        title_url_ratio = title_url_count / link_posts if link_posts else 0
+
+        # Domain concentration (how much one domain dominates)
+        domain_conc = 0.0
+        if domains:
+            from collections import Counter
+            top = Counter(domains).most_common(1)[0][1]
+            domain_conc = top / len(domains)
+
+        # Stink score: higher = more relay-like
+        commentary_norm = min(avg_non_url_len / 120.0, 1.0)
+        reply_norm = min(reply_ratio / 0.20, 1.0)
+
+        stink = (
+            0.30 * link_post_ratio
+            + 0.25 * title_url_ratio
+            + 0.15 * domain_conc
+            + 0.15 * (1.0 - reply_norm)
+            + 0.15 * (1.0 - commentary_norm)
+        )
+        stink = max(0.0, min(1.0, stink))
+
+        conn.execute(
+            "UPDATE authors SET stink_score=?, link_post_ratio=?, reply_ratio=?, avg_non_url_len=? WHERE did=?",
+            (stink, link_post_ratio, reply_ratio, avg_non_url_len, did),
+        )
+
+    conn.commit()
+    conn.close()
 
 
 def purge_old_posts(hours: int = 48):

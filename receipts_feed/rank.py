@@ -192,6 +192,14 @@ def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
             score *= vol_mult
             reasons.append(f"volume:{vol_mult:.2f}")
 
+    # Account-level stink penalty
+    if author is not None:
+        stink = author.get("stink_score", 0)
+        if stink > 0.6:
+            penalty = (stink - 0.6) * 5.0  # 0.6->0, 0.8->1.0, 1.0->2.0
+            score -= penalty
+            reasons.append(f"stink:-{penalty:.1f}")
+
     # Per-author weight (editorial taste)
     if author is not None:
         handle = author.get("handle", "")
@@ -250,8 +258,12 @@ def run_rank():
         LOG.info("no posts to rank")
         return
 
-    # Update author post counts
+    # Update author post counts and stink scores
     db.update_author_post_counts()
+    try:
+        db.compute_author_stink_scores()
+    except Exception:
+        LOG.exception("stink score computation failed (non-fatal)")
 
     # Load exclusions
     excluded = db.get_excluded_dids()

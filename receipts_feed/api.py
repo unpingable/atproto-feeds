@@ -309,3 +309,59 @@ async def debug_refresh_graph():
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, refresh_graph)
     return {"status": "ok", "result": result}
+
+
+@app.get("/debug/ranking")
+async def debug_ranking(limit: int = Query(default=30)):
+    """Debug endpoint: full rank introspection with penalties and account stats."""
+    from .rank import score_post, _strip_urls
+    conn = db.get_conn()
+    ranked = db.get_ranked_posts("receipts", limit=limit)
+    items = []
+    for r in ranked:
+        post_row = conn.execute("SELECT * FROM posts WHERE uri = ?", (r["uri"],)).fetchone()
+        if not post_row:
+            continue
+        post = dict(post_row)
+        author = db.get_author(post["author_did"])
+        non_url_text = _strip_urls(post.get("text", ""))
+        items.append({
+            "uri": r["uri"],
+            "score": r["score"],
+            "reasons": r["reasons"],
+            "author_handle": author.get("handle", "") if author else "?",
+            "author_stink": round(author.get("stink_score", 0), 3) if author else 0,
+            "author_link_ratio": round(author.get("link_post_ratio", 0), 2) if author else 0,
+            "author_reply_ratio": round(author.get("reply_ratio", 0), 2) if author else 0,
+            "author_seed_class": author.get("seed_class", "") if author else "",
+            "non_url_text_len": len(non_url_text),
+            "external_domain": post.get("external_domain", ""),
+            "text_preview": post.get("text", "")[:80],
+        })
+    conn.close()
+    return {"count": len(items), "items": items}
+
+
+@app.get("/debug/stinky")
+async def debug_stinky(limit: int = Query(default=20)):
+    """Debug endpoint: accounts with highest stink scores."""
+    conn = db.get_conn()
+    rows = conn.execute(
+        "SELECT did, handle, seed_class, stink_score, link_post_ratio, reply_ratio, "
+        "avg_non_url_len, posts_24h FROM authors WHERE stink_score > 0.3 "
+        "ORDER BY stink_score DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return {
+        "count": len(rows),
+        "accounts": [
+            {
+                "handle": r[1], "seed_class": r[2],
+                "stink": round(r[3], 3), "link_ratio": round(r[4], 2),
+                "reply_ratio": round(r[5], 2), "avg_non_url_len": round(r[6], 1),
+                "posts_24h": r[7],
+            }
+            for r in rows
+        ],
+    }
