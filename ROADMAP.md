@@ -139,17 +139,16 @@ Daily snapshots, browsable by date. Edition history with diffs.
 
 ## Known issues
 
-### Source-bot dominance
-Outsider break-ins are currently dominated by bots that post bare links
-to primary sources (congress.gov, pubmed, etc) without substantive
-commentary. These score well on domain bonus + originality but add no
-editorial value. Need to either:
-- Detect and penalize low-text-high-link bot patterns
-- Require minimum text substance for outsider domain bonuses
-- Maintain a bot/tracker author list with reduced weight
-- Or some combination
+### Source-bot dominance (addressed)
+Previously the main quality problem. Now handled by three layers:
+- Post-level relay penalty for low-commentary link posts
+- Account-level stink score (7-day rolling behavior analysis)
+- Outsider relay penalty for prolific domain-specific bots
+- Cluster representative selection preferring human curators over relays
 
-This is the main quality problem with the current outsider pipeline.
+Covered by 13 regression tests. In cooling-off period — only reopen if
+new bot subtypes evade the current model or legitimate curators get
+unfairly buried.
 
 ## Design constraints (persistent)
 

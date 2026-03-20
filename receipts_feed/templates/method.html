@@ -47,12 +47,42 @@
             face diminishing returns. At 20 posts/day, their score is multiplied by 0.7.
             At 40 posts/day, 0.5. Their posts need to be proportionally better to compete.</li>
         <li><strong>Repost</strong> &mdash; hard -6. Reposts are noise in this context.</li>
+        <li><strong>Relay penalty</strong> &mdash; posts with an external link but minimal
+            non-URL commentary are penalized. This catches syndication exhaust: accounts
+            that post link + title with no editorial value. Measured by stripping URLs
+            from the text and checking what remains.</li>
+        <li><strong>Account stink score</strong> &mdash; a rolling 7-day behavior score
+            measuring how relay-shaped an account acts: link-post ratio, reply ratio,
+            average commentary length, domain concentration. Accounts scoring above 0.6
+            get a penalty. This is behavior-based, not identity-based.</li>
+        <li><strong>Outsider relay penalty</strong> &mdash; accounts outside the seed graph
+            that enter via domain bonuses are penalized if they've posted 10+ times to the
+            same domain. Catches prolific structured bots that are verbose enough to dodge
+            post-level checks.</li>
         <li><strong>Author weights</strong> &mdash; a small number of specific authors have manual
             score multipliers applied. These are editorial overrides for known edge cases
-            where the general rules aren't enough. An author at 0.25 weight needs to post
-            something 4x better than baseline to rank. This is taste, not algorithm, and
+            where the general rules aren't enough. This is taste, not algorithm, and
             it's acknowledged rather than hidden.</li>
     </ul>
+
+    <h2>Clustering and Representative Selection</h2>
+    <p>
+        Posts linking to the same URL or in the same reply thread are grouped
+        into story clusters. The site homepage shows one lead post per cluster.
+    </p>
+    <p>
+        Within a cluster, the lead representative is chosen by a multi-tier
+        preference: graph membership first, commentary quality second, raw score
+        as tiebreaker. A mutual with 80 characters of real commentary beats an
+        outsider relay with 180 characters of reformatted bill text, even if
+        the relay scored higher on raw metrics. This is the key distinction:
+        commentary value vs publication exhaust length.
+    </p>
+    <p>
+        Document floods (congress, research, filings) are further compacted
+        into docket cards: the best item stays as a full story, the rest are
+        bundled into a summary card.
+    </p>
 
     <h2>Composition Rules</h2>
     <p>
