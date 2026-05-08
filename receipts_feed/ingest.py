@@ -92,6 +92,8 @@ def _parse_post(js: dict) -> Optional[dict]:
 
     # Extract external link
     external_uri = None
+    external_title = None
+    external_description = None
     embed = record.get("embed", {})
     has_image = False
     has_video = False
@@ -100,11 +102,16 @@ def _parse_post(js: dict) -> Optional[dict]:
         ext = embed.get("external", {})
         if ext and ext.get("uri"):
             external_uri = ext["uri"]
+            external_title = ext.get("title") or None
+            external_description = ext.get("description") or None
         media = embed.get("media", {})
         if media:
             ext2 = media.get("external", {})
             if ext2 and ext2.get("uri"):
-                external_uri = external_uri or ext2["uri"]
+                if not external_uri:
+                    external_uri = ext2["uri"]
+                    external_title = ext2.get("title") or None
+                    external_description = ext2.get("description") or None
         if "image" in embed_type:
             has_image = True
         if "video" in embed_type:
@@ -143,6 +150,8 @@ def _parse_post(js: dict) -> Optional[dict]:
         "quote_uri": quote_uri,
         "external_uri": external_uri,
         "external_domain": external_domain,
+        "external_title": external_title,
+        "external_description": external_description,
         "has_external_embed": bool(external_uri),
         "has_image": has_image,
         "has_video": has_video,

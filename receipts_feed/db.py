@@ -63,6 +63,8 @@ def init_db():
             quote_uri TEXT,
             external_uri TEXT,
             external_domain TEXT,
+            external_title TEXT,
+            external_description TEXT,
             has_external_embed INTEGER DEFAULT 0,
             has_image INTEGER DEFAULT 0,
             has_video INTEGER DEFAULT 0,
@@ -73,6 +75,16 @@ def init_db():
             indexed_at TEXT
         )
     """)
+
+    # Migration for existing post DBs (idempotent)
+    for col, typedef in [
+        ("external_title", "TEXT"),
+        ("external_description", "TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE posts ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ranked_posts (
@@ -227,9 +239,10 @@ def insert_post(post: dict):
     conn.execute(
         "INSERT OR IGNORE INTO posts "
         "(uri, cid, author_did, created_at, text, reply_to_uri, root_uri, quote_uri, "
-        "external_uri, external_domain, has_external_embed, has_image, has_video, "
+        "external_uri, external_domain, external_title, external_description, "
+        "has_external_embed, has_image, has_video, "
         "is_repost, langs, link_count, facets_count, indexed_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             post["uri"],
             post.get("cid", ""),
@@ -241,6 +254,8 @@ def insert_post(post: dict):
             post.get("quote_uri"),
             post.get("external_uri"),
             post.get("external_domain"),
+            post.get("external_title"),
+            post.get("external_description"),
             int(post.get("has_external_embed", False)),
             int(post.get("has_image", False)),
             int(post.get("has_video", False)),
