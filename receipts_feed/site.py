@@ -451,6 +451,101 @@ def _excerpt_differs(headline: str, text: str) -> bool:
     return True
 
 
+# --- Section grouping for the wire-desk homepage ---
+
+# Order in which sections appear on the homepage. Filing + regulation
+# share a top slot ("Filings & Regulation") because the wire-desk reads
+# them together. Wire goes into the right-rail ticker (short, fast,
+# monospace), not the main flow. Unknown / overflow lands below the fold.
+_MAIN_SECTION_ORDER: list[tuple[str, list[str]]] = [
+    ("Filings & Regulation", ["filing", "regulation"]),
+    ("Papers",               ["paper"]),
+    ("Reporting",            ["reporting"]),
+    ("From the Graph",       ["graph_note"]),
+    ("Code & Standards",     ["code"]),
+]
+
+# Source classes that go into the right-rail ticker (short, headline-bar
+# style). Wire copy is for the rail.
+_WIRE_CLASSES = {"wire", "wire_blip"}
+
+
+def _group_items_into_sections(items: list[dict]) -> dict:
+    """Split a flat item list into the wire-desk section structure.
+
+    Returns:
+      {
+        "main": [
+          {"label": "Filings & Regulation", "items": [...]},
+          {"label": "Papers", "items": [...]},
+          ...
+        ],
+        "wire": [...short headline items for the rail ticker...],
+        "below_fold": [...overflow / unknown class...],
+      }
+
+    Items keep their original dict shape; only the grouping changes.
+    """
+    by_class: dict[str, list[dict]] = {}
+    for item in items:
+        cls = item.get("source_class") or "unknown"
+        by_class.setdefault(cls, []).append(item)
+
+    main: list[dict] = []
+    for label, classes in _MAIN_SECTION_ORDER:
+        merged: list[dict] = []
+        for cls in classes:
+            merged.extend(by_class.get(cls, []))
+        if merged:
+            # Field name is `stories` (not `items`) because Jinja resolves
+            # `section.items` to the dict's `.items()` method, not the key.
+            main.append({"label": label, "stories": merged})
+
+    wire: list[dict] = []
+    for cls in _WIRE_CLASSES:
+        wire.extend(by_class.get(cls, []))
+
+    # Anything left (unknown + any class not in the ordered set) goes
+    # below the fold. Sorted by score desc so the best survivors lead.
+    handled = set()
+    for _, classes in _MAIN_SECTION_ORDER:
+        handled.update(classes)
+    handled.update(_WIRE_CLASSES)
+    below: list[dict] = []
+    for cls, vals in by_class.items():
+        if cls in handled:
+            continue
+        below.extend(vals)
+    below.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+
+    return {
+        "main": main,
+        "wire": wire,
+        "below_fold": below,
+    }
+
+
+def _short_wire_text(item: dict, max_chars: int = 64) -> str:
+    """One-line wire-ticker text for the rail.
+
+    Prefers source-class-stamp shape:
+      `<DOMAIN> · <headline truncated>`
+    Falls back to display_headline / text when the domain is missing.
+    """
+    parts: list[str] = []
+    dom = item.get("source_domain") or item.get("external_domain") or ""
+    headline = (
+        item.get("display_headline")
+        or item.get("dek_quote")
+        or item.get("text")
+        or ""
+    )
+    if dom:
+        parts.append(dom)
+    parts.append(_truncate_word(headline.replace("\n", " ").strip(), max_chars))
+    return " · ".join(p for p in parts if p)
+
+
 def _relative_time(iso_str: str) -> str:
     """Convert ISO timestamp to relative time string."""
     try:
@@ -555,12 +650,46 @@ async def homepage(request: Request):
     edition = _get_current_edition()
     items = edition.get("items", [])
     hero_idx = edition.get("hero_idx", 0)
-    hero = items[hero_idx] if items else None
-    rest = [it for i, it in enumerate(items) if i != hero_idx][:29]
+
+    # Stamp a relative-time `age` string on every item so the template can
+    # render the byline without a Jinja filter call.
+    for it in items:
+        it["age"] = _relative_time(it.get("created_at") or "")
+
+    # Wire-desk grouping. The first item of the first main section
+    # carries `.lead` styling automatically via the template.
+    groups = _group_items_into_sections(items)
+    wire_ticker = [
+        {
+            "text": _short_wire_text(it, max_chars=70),
+            "web_url": it.get("web_url", ""),
+            "display_url": it.get("display_url") or it.get("external_uri") or "",
+            "source_domain": it.get("source_domain") or "",
+        }
+        for it in groups["wire"][:8]
+    ]
+    below_fold = [
+        {
+            "headline": _truncate_word(
+                it.get("display_headline") or it.get("text", ""), 80
+            ),
+            "web_url": it.get("web_url", ""),
+            "display_url": it.get("display_url") or it.get("external_uri") or "",
+            "author_handle": it.get("author_handle", ""),
+            "age": it.get("age", ""),
+            "source_domain": it.get("source_domain") or "",
+            "source_class": it.get("source_class") or "unknown",
+        }
+        for it in groups["below_fold"][:12]
+    ]
+
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "hero": hero,
-        "posts": rest,
+        # Legacy fields kept for backward compat with the old template
+        # (and so the archive / edition_detail pages — which share these —
+        # don't break). The new wire-desk template reads `sections`.
+        "hero": items[hero_idx] if items else None,
+        "posts": [it for i, it in enumerate(items) if i != hero_idx][:29],
         "stats": edition.get("stats", {}),
         "updated_at": edition.get("created_at"),
         "relative_time": _relative_time,
@@ -569,6 +698,10 @@ async def homepage(request: Request):
         "excerpt_ok": _excerpt_differs,
         "marginalia": get_marginalia(count=2),
         "diff": _compute_edition_diff(),
+        # New wire-desk fields
+        "sections": groups["main"],
+        "wire_ticker": wire_ticker,
+        "below_fold": below_fold,
     })
 
 
