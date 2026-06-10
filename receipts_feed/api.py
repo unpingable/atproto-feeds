@@ -269,6 +269,19 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/health/semantic")
+async def health_semantic():
+    """Semantic feed health: drain alive + advancing + consumer-useful.
+
+    In-process so it can read live queue + drain state from the consumer.
+    Does NOT make external network calls (e.g. AppView probe) — that's
+    too long-tailed for an HTTP handler. Run `receipts-feed health` from
+    cron for the deep check including AppView resolution.
+    """
+    from . import health as health_mod
+    return health_mod.compute_health(consumer=_consumer, probe_appview=False)
+
+
 @app.get("/debug/top")
 async def debug_top(feed: str = Query(default="receipts"), limit: int = Query(default=20)):
     """Debug endpoint: show top ranked posts with reasons."""

@@ -164,6 +164,15 @@ class JetstreamConsumer:
         self._last_cursor: Optional[str] = None
         self._event_queue: asyncio.Queue = asyncio.Queue(maxsize=5000)
         self._seed_dids: set[str] = set()
+        # Drain-progress watchdog: monotonic timestamp updated each time the
+        # drain loop iterates with progress. Stale value here ==> drain is
+        # alive-but-not-advancing (the failure mode the May 30 incident
+        # mutated into after we hardened the silent-death path). Read by
+        # health.compute_health() to assert progress, not just liveness.
+        self._last_progress_at: float = 0.0
+        # Rolling counters for the health check (instantaneous backlog/drop
+        # rates from the queue itself; STATS still emits aggregates).
+        self._drop_rate_per_min: float = 0.0
 
     def _refresh_seed_dids(self):
         self._seed_dids = db.get_seed_dids()
@@ -255,14 +264,21 @@ class JetstreamConsumer:
 
                 # Stats every 60s
                 if now - last_stats >= 60:
+                    elapsed = now - last_stats
                     last_stats = now
                     dropped = self._events_dropped
                     self._events_dropped = 0
+                    self._drop_rate_per_min = dropped * (60.0 / elapsed) if elapsed > 0 else 0.0
                     backlog = self._event_queue.qsize()
                     LOG.info(
                         "STATS events=%d backlog=%d dropped=%d seed_authors=%d",
                         self._event_count, backlog, dropped, len(self._seed_dids),
                     )
+                # Progress watchdog timestamp: updated on every loop iter
+                # (whether or not an event was processed). Stale ==> drain
+                # alive-but-stuck; fresh ==> drain advancing.
+                import time as _time_mod
+                self._last_progress_at = _time_mod.time()
             except asyncio.CancelledError:
                 break
             except Exception:

@@ -36,6 +36,24 @@ def main():
     # debug
     sub.add_parser("top", help="Show top ranked posts (debug)")
 
+    # semantic feed health check (cron-friendly; nonzero exit on degraded/failed)
+    health_p = sub.add_parser(
+        "health",
+        help="Semantic feed health (alive + advancing + consumer-useful)",
+    )
+    health_p.add_argument(
+        "--no-appview-probe", action="store_true",
+        help="Skip the external public.api.bsky.app AppView resolution probe",
+    )
+    health_p.add_argument(
+        "--sample-size", type=int, default=5,
+        help="Number of skeleton URIs to AppView-probe (default 5)",
+    )
+    health_p.add_argument(
+        "--json", action="store_true", dest="json_output",
+        help="Emit the receipt as JSON to stdout",
+    )
+
     args = parser.parse_args()
 
     if args.cmd == "serve":
@@ -74,6 +92,43 @@ def main():
             description=args.description,
         )
         print(f"Published: {result}")
+
+    elif args.cmd == "health":
+        import json as _json
+        from . import db, health
+        db.init_db()
+        # consumer=None: the CLI runs out-of-process from the live service,
+        # so the in-process checks (queue backlog, drain progress, drop
+        # rate) report verdict=skipped. The DB-driven checks (cursor age,
+        # newest skeleton item, renderable ratio) and the AppView probe
+        # cover what the CLI can see externally.
+        receipt = health.compute_health(
+            consumer=None,
+            probe_appview=not args.no_appview_probe,
+            skeleton_sample_size=args.sample_size,
+        )
+        if args.json_output:
+            print(_json.dumps(receipt, indent=2))
+        else:
+            print(f"=== {receipt['receipt_kind']} ===")
+            print(f"verdict          : {receipt['verdict']}")
+            print(f"generated_at     : {receipt['generated_at']}")
+            print(f"skeleton_size    : {receipt['skeleton_size']}")
+            print(f"probe_appview    : {receipt['probe_appview']}")
+            print()
+            print(f"{'check':<36} {'verdict':<8} value")
+            print(f"{'-'*36} {'-'*8} {'-'*20}")
+            for c in receipt["checks"]:
+                val = c.get("value")
+                print(f"{c['name']:<36} {c['verdict']:<8} {val}")
+                if c.get("note"):
+                    print(f"  · {c['note']}")
+            print()
+            print("rationale:")
+            for r in receipt["rationale"]:
+                print(f"  - {r}")
+        if receipt["verdict"] in ("degraded", "failed"):
+            sys.exit(2)
 
     elif args.cmd == "top":
         from . import db
