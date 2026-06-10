@@ -17,7 +17,11 @@ from .domains import domain_bonus
 
 LOG = logging.getLogger("receipts.ingest")
 
-WANTED_COLLECTIONS = ["app.bsky.feed.post", "app.bsky.feed.repost"]
+# Only post records — reposts are unrenderable when served via getFeedSkeleton
+# (Bluesky AppView can't load app.bsky.feed.repost URIs through the post path)
+# and we penalize them -6 in rank, so subscribing to them doubles Jetstream
+# load to no purpose. Removed 2026-06-10 after the May 30 drain-task death.
+WANTED_COLLECTIONS = ["app.bsky.feed.post"]
 
 
 def _build_ws_url(base_url: str, cursor: Optional[str] = None) -> str:
@@ -70,17 +74,6 @@ def _parse_post(js: dict) -> Optional[dict]:
 
     if operation not in ("create", "update"):
         return None
-
-    if collection == "app.bsky.feed.repost":
-        return {
-            "_op": "create",
-            "uri": uri,
-            "cid": cid,
-            "author_did": did,
-            "created_at": record.get("createdAt", created_at),
-            "text": "",
-            "is_repost": True,
-        }
 
     if collection != "app.bsky.feed.post":
         return None
@@ -194,51 +187,89 @@ class JetstreamConsumer:
             return
         db.insert_post(post)
 
+    def _on_drain_done(self, task: asyncio.Task) -> None:
+        """Callback so the drain task can never die silently.
+
+        Logs the exception (and `LOG.critical` because if drain has died, the
+        cursor will freeze and ingestion will silently stop). Does NOT auto-
+        restart in v0 — the outer loop has a broad except that should keep
+        drain alive; if it still dies, that's something we want visible.
+        """
+        if task.cancelled():
+            LOG.info("drain task cancelled")
+            return
+        exc = task.exception()
+        if exc is not None:
+            LOG.critical("drain task died with exception: %r", exc, exc_info=exc)
+        else:
+            LOG.critical("drain task exited unexpectedly (no exception); ingestion will silently stop")
+
     async def _drain_queue(self):
         loop = asyncio.get_event_loop()
         last_stats = loop.time()
         last_graph_refresh = loop.time()
 
+        # Belt-and-suspenders: the outer loop body is wrapped in a broad
+        # except so a transient exception (sqlite database-is-locked, etc.)
+        # can never kill the drain task. May 30 2026 incident: an unwrapped
+        # `db.upsert_cursor` call here raised OperationalError during a
+        # WAL-locked window, drain died silently, cursor froze for 11 days.
         while not self._stop:
             try:
-                ev = await asyncio.wait_for(self._event_queue.get(), timeout=10.0)
-            except asyncio.TimeoutError:
-                ev = None
+                try:
+                    ev = await asyncio.wait_for(self._event_queue.get(), timeout=10.0)
+                except asyncio.TimeoutError:
+                    ev = None
+                except asyncio.CancelledError:
+                    break
+
+                if ev is not None:
+                    try:
+                        await loop.run_in_executor(None, self._process_event, ev)
+                    except Exception:
+                        LOG.exception("failed to process event")
+
+                    self._event_count += 1
+
+                    if self._event_count % config.CURSOR_SAVE_INTERVAL == 0:
+                        if self._last_cursor:
+                            try:
+                                await loop.run_in_executor(
+                                    None,
+                                    db.upsert_cursor,
+                                    config.CONSUMER_NAME,
+                                    self._last_cursor,
+                                )
+                            except Exception:
+                                LOG.exception("failed to save cursor; will retry on next interval")
+
+                now = loop.time()
+
+                # Refresh seed graph every 10 minutes
+                if now - last_graph_refresh >= 600:
+                    last_graph_refresh = now
+                    try:
+                        await loop.run_in_executor(None, self._refresh_seed_dids)
+                    except Exception:
+                        LOG.exception("failed to refresh seed graph")
+
+                # Stats every 60s
+                if now - last_stats >= 60:
+                    last_stats = now
+                    dropped = self._events_dropped
+                    self._events_dropped = 0
+                    backlog = self._event_queue.qsize()
+                    LOG.info(
+                        "STATS events=%d backlog=%d dropped=%d seed_authors=%d",
+                        self._event_count, backlog, dropped, len(self._seed_dids),
+                    )
             except asyncio.CancelledError:
                 break
-
-            if ev is not None:
-                try:
-                    await loop.run_in_executor(None, self._process_event, ev)
-                except Exception:
-                    LOG.exception("failed to process event")
-
-                self._event_count += 1
-
-                if self._event_count % config.CURSOR_SAVE_INTERVAL == 0:
-                    if self._last_cursor:
-                        await loop.run_in_executor(None, db.upsert_cursor, config.CONSUMER_NAME, self._last_cursor)
-
-            now = loop.time()
-
-            # Refresh seed graph every 10 minutes
-            if now - last_graph_refresh >= 600:
-                last_graph_refresh = now
-                try:
-                    await loop.run_in_executor(None, self._refresh_seed_dids)
-                except Exception:
-                    LOG.exception("failed to refresh seed graph")
-
-            # Stats every 60s
-            if now - last_stats >= 60:
-                last_stats = now
-                dropped = self._events_dropped
-                self._events_dropped = 0
-                backlog = self._event_queue.qsize()
-                LOG.info(
-                    "STATS events=%d backlog=%d dropped=%d seed_authors=%d",
-                    self._event_count, backlog, dropped, len(self._seed_dids),
-                )
+            except Exception:
+                # Catch-all: never let drain die from a transient exception.
+                # Sleep briefly to avoid tight error loops, then re-enter.
+                LOG.exception("drain loop iteration failed; continuing")
+                await asyncio.sleep(1)
 
     async def run(self):
         db.init_db()
@@ -251,6 +282,7 @@ class JetstreamConsumer:
         LOG.info("starting Jetstream consumer, cursor=%s", saved_cursor)
 
         drain_task = asyncio.ensure_future(self._drain_queue())
+        drain_task.add_done_callback(self._on_drain_done)
 
         while not self._stop:
             try:
