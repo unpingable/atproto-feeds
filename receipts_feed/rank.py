@@ -75,8 +75,22 @@ def _freshness_multiplier(created_at: str) -> float:
     return math.exp(-0.058 * age_hours)  # half-life ~12h
 
 
-def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
-    """Score a single post. Returns (score, reasons)."""
+def score_post(
+    post: dict,
+    author: dict | None,
+    *,
+    outsider_domain_counts: dict[tuple[str, str], int] | None = None,
+) -> tuple[float, list[str]]:
+    """Score a single post. Returns (score, reasons).
+
+    outsider_domain_counts: optional pre-aggregated map of
+    (author_did, external_domain) → count. When provided, the outsider
+    relay check looks up the count in O(1) instead of opening a fresh
+    DB connection per candidate (the N+1 that exploded the May 30 rank
+    pass under contention). When None, falls back to the legacy
+    per-candidate query so unit tests that don't supply the map still
+    work.
+    """
     score = 0.0
     reasons = []
 
@@ -204,17 +218,22 @@ def score_post(post: dict, author: dict | None) -> tuple[float, list[str]]:
     # with the same domain are likely structured relay bots.
     # Graph members already have stink scores; this catches outsiders.
     if author is None and has_embed and not platform_link:
-        # Check how many posts this outsider has with this domain
         author_did = post.get("author_did", "")
         ext_domain_check = post.get("external_domain", "")
         if author_did and ext_domain_check:
-            conn = db.get_conn()
-            count_row = conn.execute(
-                "SELECT COUNT(*) FROM posts WHERE author_did = ? AND external_domain = ?",
-                (author_did, ext_domain_check),
-            ).fetchone()
-            conn.close()
-            outsider_domain_posts = count_row[0] if count_row else 0
+            if outsider_domain_counts is not None:
+                outsider_domain_posts = outsider_domain_counts.get(
+                    (author_did, ext_domain_check), 0
+                )
+            else:
+                # Legacy fallback for unit tests that don't pre-aggregate
+                conn = db.get_conn()
+                count_row = conn.execute(
+                    "SELECT COUNT(*) FROM posts WHERE author_did = ? AND external_domain = ?",
+                    (author_did, ext_domain_check),
+                ).fetchone()
+                conn.close()
+                outsider_domain_posts = count_row[0] if count_row else 0
             if outsider_domain_posts > 10:
                 penalty = min((outsider_domain_posts - 10) * 0.2, 4.0)
                 score -= penalty
@@ -303,19 +322,26 @@ def run_rank():
     except Exception:
         LOG.exception("stink score computation failed (non-fatal)")
 
-    # Load exclusions
+    # Load exclusions + batch the author + outsider-domain lookups so the
+    # score loop never opens a connection. Pre-aggregating outside the
+    # score loop replaces the N+1 that drove the May 30 75s tail under
+    # contention; the score loop now does pure Python dict lookups.
     excluded = _stage("get_excluded_dids", db.get_excluded_dids)
+    authors_by_did = _stage("get_all_authors_by_did", db.get_all_authors_by_did)
+    outsider_counts = _stage(
+        "get_outsider_domain_counts", db.get_outsider_domain_counts,
+    )
 
     # Score each post
     t_score_start = _t.perf_counter()
-    author_lookups = 0
     scored = []
     for post in posts:
         if post["author_did"] in excluded:
             continue
-        author = db.get_author(post["author_did"])
-        author_lookups += 1
-        score, reasons = score_post(post, author)
+        author = authors_by_did.get(post["author_did"])
+        score, reasons = score_post(
+            post, author, outsider_domain_counts=outsider_counts,
+        )
         scored.append({
             "uri": post["uri"],
             "score": score,
@@ -323,7 +349,6 @@ def run_rank():
             "post": post,
         })
     stage_times["score_loop"] = (_t.perf_counter() - t_score_start) * 1000.0
-    stage_times["_author_lookups_count"] = author_lookups  # not a timing
 
     # Sort by score descending
     scored.sort(key=lambda x: x["score"], reverse=True)
@@ -343,15 +368,18 @@ def run_rank():
     total_ms = (_t.perf_counter() - rank_start) * 1000.0
     LOG.info("ranked %d posts (from %d candidates)", len(ranked), len(posts))
     LOG.info(
-        "RANK PROFILE total=%.0fms candidates=%d author_lookups=%d "
+        "RANK PROFILE total=%.0fms candidates=%d "
         "stages: get_recent_posts=%.0fms update_author_post_counts=%.0fms "
         "compute_author_stink_scores=%.0fms get_excluded_dids=%.0fms "
+        "get_all_authors=%.0fms outsider_counts=%.0fms "
         "score_loop=%.0fms composition=%.0fms save_ranked=%.0fms purge=%.0fms",
-        total_ms, len(posts), author_lookups,
+        total_ms, len(posts),
         stage_times.get("get_recent_posts", -1),
         stage_times.get("update_author_post_counts", -1),
         stage_times.get("compute_author_stink_scores", -1),
         stage_times.get("get_excluded_dids", -1),
+        stage_times.get("get_all_authors_by_did", -1),
+        stage_times.get("get_outsider_domain_counts", -1),
         stage_times.get("score_loop", -1),
         stage_times.get("_apply_composition_rules", -1),
         stage_times.get("save_ranked_posts", -1),

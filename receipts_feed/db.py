@@ -178,6 +178,14 @@ def init_db():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_did)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_posts_domain ON posts(external_domain)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ranked_score ON ranked_posts(feed_name, score DESC)")
+    # Compound index for the rank pass's outsider-relay aggregate
+    # (`SELECT author_did, external_domain, COUNT(*) GROUP BY ...`). Keeps
+    # the pre-aggregation cheap so we can replace the N+1 in score_post
+    # with a single dict lookup.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_posts_author_domain "
+        "ON posts(author_did, external_domain)"
+    )
 
     conn.commit()
     conn.close()
@@ -231,6 +239,52 @@ def get_author(did: str) -> Optional[dict]:
     if not row:
         return None
     return dict(row)
+
+
+def get_all_authors_by_did() -> dict[str, dict]:
+    """Batch alternative to N×get_author() in the rank score loop.
+
+    Single SELECT returning every author keyed by DID. The whole authors
+    table is small (~4k rows on the live DB; payload <1 MB), so this is
+    cheaper than the N+1 connection-open pattern even for ranking
+    a few thousand candidates.
+
+    May 30 2026 incident: per-candidate get_author() opened a fresh
+    connection (and PRAGMA-set busy_timeout=5000) for every post; under
+    drain-task write contention the connection setup queued behind the
+    writer lock, blowing up score_loop from ~3s to 75s. See
+    rank.run_rank()'s RANK PROFILE log for the after-numbers.
+    """
+    conn = get_conn()
+    try:
+        rows = conn.execute("SELECT * FROM authors").fetchall()
+    finally:
+        conn.close()
+    return {row["did"]: dict(row) for row in rows}
+
+
+def get_outsider_domain_counts() -> dict[tuple[str, str], int]:
+    """Pre-aggregate `(author_did, external_domain) -> count` for the
+    outsider-relay check inside score_post.
+
+    Replaces an in-score N+1 (`SELECT COUNT(*) FROM posts WHERE author_did
+    = ? AND external_domain = ?` per outsider candidate). Backed by the
+    compound index idx_posts_author_domain.
+
+    Empty external_domain entries (no embed) are skipped — the score
+    function only consults this map when has_external_embed is true.
+    """
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT author_did, external_domain, COUNT(*) "
+            "FROM posts "
+            "WHERE external_domain IS NOT NULL AND external_domain != '' "
+            "GROUP BY author_did, external_domain"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {(r[0], r[1]): r[2] for r in rows}
 
 
 def insert_post(post: dict):
