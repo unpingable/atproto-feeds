@@ -182,6 +182,16 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     lead_uris = [c["lead_post_uri"] for c in clusters]
     hydrated = hydrate_posts(lead_uris)
 
+    # Source-first pivot (2026-06-10): stories ARE URLs. For each cluster
+    # with a canonical_url, look up the cached url_metadata so the
+    # headline becomes the linked content's og:title, not the lead post's
+    # text. The post text becomes the attributed dek/quote.
+    from . import source_class as _sc
+    canonical_urls = [
+        c.get("canonical_url") for c in clusters if c.get("canonical_url")
+    ]
+    url_meta_by_url = db.get_url_metadata_batch(canonical_urls) if canonical_urls else {}
+
     items = []
     for c in clusters:
         if len(items) >= limit:
@@ -189,8 +199,63 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
         h = hydrated.get(c["lead_post_uri"])
         if not h:
             continue
-        raw_headline = h.get("display_headline", "") or h.get("text", "")
-        h["display_headline"] = _clean_headline(raw_headline) or raw_headline
+
+        canonical = c.get("canonical_url")
+        url_meta = url_meta_by_url.get(canonical) if canonical else None
+
+        if url_meta and url_meta.get("og_title"):
+            # URL is the story. og_title is the headline; lead-post text
+            # becomes the dek/quote. The post's own display_headline
+            # (Bluesky's link card title) is preserved for diagnostic
+            # comparison but no longer drives display.
+            url_headline = _clean_headline(url_meta["og_title"]) or url_meta["og_title"]
+            h["display_headline"] = url_headline
+            dek_quote = _clean_headline(h.get("text", "")) or h.get("text", "")
+            source_domain = url_meta.get("domain") or ""
+            source_class = url_meta.get("source_class") or _sc.SOURCE_CLASS_UNKNOWN
+            headline_basis = "og_title"
+            og_description = url_meta.get("og_description") or ""
+        elif canonical:
+            # Canonical URL exists but OG fetch hasn't completed yet (or
+            # failed). Fall back to the post's hydrated headline but mark
+            # the basis so we can see in the data when OG is missing.
+            raw_headline = h.get("display_headline", "") or h.get("text", "")
+            h["display_headline"] = _clean_headline(raw_headline) or raw_headline
+            dek_quote = ""
+            # Source domain: prefer canonical-derived (always present;
+            # always lowercase; no `www.`) over the post's stored
+            # external_domain (which may be missing or formatted
+            # inconsistently). Falls back to external_domain when canonical
+            # parse fails for some reason.
+            from .urls import extract_domain as _extract_domain
+            source_domain = (
+                _extract_domain(canonical) or h.get("external_domain") or ""
+            )
+            source_class = _sc.classify_domain(source_domain)
+            headline_basis = "post_fallback"
+            og_description = ""
+        else:
+            # No canonical URL — graph note. Post text IS the object,
+            # and should be rendered as a quote/note rather than dressed
+            # up as a headline.
+            raw_headline = h.get("display_headline", "") or h.get("text", "")
+            h["display_headline"] = _clean_headline(raw_headline) or raw_headline
+            dek_quote = ""
+            source_domain = ""
+            source_class = _sc.SOURCE_CLASS_GRAPH_NOTE
+            headline_basis = "graph_note"
+            og_description = ""
+
+        # Display URL: prefer the canonical (utm-stripped) form so the byline
+        # link doesn't carry tracking junk. Falls back to whatever the post
+        # had stored. The template still reads `external_uri` for the
+        # link href + display text — overwriting on the item copy is the
+        # smallest change here; the source data on the post row is
+        # untouched.
+        display_url = canonical or h.get("external_uri") or ""
+        if display_url:
+            h["external_uri"] = display_url
+
         items.append({
             **h,
             "score": c["cluster_score"],
@@ -202,6 +267,14 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
             "unique_authors": c["unique_authors"],
             "cluster_state": c.get("state", "active"),
             "canonical_url": c.get("canonical_url"),
+            # Source-first fields (chatty 2026-06-10)
+            "dek_quote": dek_quote,
+            "source_domain": source_domain,
+            "source_class": source_class,
+            "section_label": _sc.section_for(source_class),
+            "headline_basis": headline_basis,
+            "og_description": og_description,
+            "display_url": display_url,
         })
 
     if not items:

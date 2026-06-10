@@ -167,6 +167,27 @@ def init_db():
         )
     """)
 
+    # url_metadata — cached OG / source metadata per canonical URL.
+    # Source-first pivot (2026-06-10): the story is the URL, not the post.
+    # The site does NOT mirror Bluesky posts; this table caches public
+    # source metadata for linked URLs only — title, description, image,
+    # domain, content-type. See about/method for the doctrine line.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS url_metadata (
+            canonical_url TEXT PRIMARY KEY,
+            final_url TEXT,
+            domain TEXT,
+            content_type TEXT,
+            og_title TEXT,
+            og_description TEXT,
+            og_image TEXT,
+            fetch_status INTEGER,
+            fetch_error TEXT,
+            fetched_at TEXT,
+            source_class TEXT
+        )
+    """)
+
     # Indexes
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_type ON story_clusters(cluster_type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_key ON story_clusters(cluster_key)")
@@ -185,6 +206,17 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_posts_author_domain "
         "ON posts(author_did, external_domain)"
+    )
+    # Index for the OG fetcher's "needs-fetch" query (find canonical_urls
+    # referenced by recent posts that don't have a row yet, ordered by
+    # last-attempted-at so failures back off).
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_url_metadata_fetched "
+        "ON url_metadata(fetched_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_url_metadata_status "
+        "ON url_metadata(fetch_status)"
     )
 
     conn.commit()
@@ -573,6 +605,166 @@ def remove_exclusion(did: str):
     )
     conn.commit()
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# url_metadata helpers (source-first pivot, 2026-06-10)
+# ---------------------------------------------------------------------------
+
+def upsert_url_metadata(
+    canonical_url: str,
+    *,
+    final_url: Optional[str] = None,
+    domain: Optional[str] = None,
+    content_type: Optional[str] = None,
+    og_title: Optional[str] = None,
+    og_description: Optional[str] = None,
+    og_image: Optional[str] = None,
+    fetch_status: Optional[int] = None,
+    fetch_error: Optional[str] = None,
+    source_class: Optional[str] = None,
+) -> None:
+    """Upsert a row in url_metadata. Always stamps fetched_at to now.
+
+    Field semantics:
+      canonical_url   — primary key, the canonical form the cluster keys on
+      final_url       — URL after following redirects (may differ from canonical)
+      domain          — bare host (e.g. apnews.com)
+      content_type    — Content-Type header on the final response
+      og_title        — og:title (or <title>) extracted from the response body
+      og_description  — og:description
+      og_image        — og:image (kept as URL, not mirrored)
+      fetch_status    — HTTP status of the final response, or null on connect error
+      fetch_error     — short error string when fetch_status is null
+      source_class    — classification from source_class.classify_domain(domain)
+    """
+    conn = get_conn()
+    now = timeutil.now_utc().isoformat()
+    try:
+        conn.execute(
+            """
+            INSERT INTO url_metadata
+              (canonical_url, final_url, domain, content_type,
+               og_title, og_description, og_image,
+               fetch_status, fetch_error, fetched_at, source_class)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(canonical_url) DO UPDATE SET
+              final_url       = excluded.final_url,
+              domain          = excluded.domain,
+              content_type    = excluded.content_type,
+              og_title        = excluded.og_title,
+              og_description  = excluded.og_description,
+              og_image        = excluded.og_image,
+              fetch_status    = excluded.fetch_status,
+              fetch_error     = excluded.fetch_error,
+              fetched_at      = excluded.fetched_at,
+              source_class    = excluded.source_class
+            """,
+            (
+                canonical_url, final_url, domain, content_type,
+                og_title, og_description, og_image,
+                fetch_status, fetch_error, now, source_class,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_url_metadata(canonical_url: str) -> Optional[dict]:
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM url_metadata WHERE canonical_url = ?",
+            (canonical_url,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return dict(row) if row else None
+
+
+def get_url_metadata_batch(canonical_urls: list[str]) -> dict[str, dict]:
+    """Return a {canonical_url -> metadata dict} map for the given URLs.
+
+    Cheap-batch alternative to get_url_metadata() in tight render loops.
+    """
+    if not canonical_urls:
+        return {}
+    conn = get_conn()
+    try:
+        placeholders = ",".join("?" for _ in canonical_urls)
+        rows = conn.execute(
+            f"SELECT * FROM url_metadata WHERE canonical_url IN ({placeholders})",
+            canonical_urls,
+        ).fetchall()
+    finally:
+        conn.close()
+    return {row["canonical_url"]: dict(row) for row in rows}
+
+
+def list_canonical_urls_needing_fetch(
+    *,
+    limit: int = 50,
+    max_age_hours: int = 24 * 7,
+) -> list[str]:
+    """Return canonical_urls referenced by posts but missing from
+    url_metadata OR with a stale fetch.
+
+    Stale = older than max_age_hours, or fetched_at is null. Successful
+    rows (fetch_status 200) get a longer refetch interval; failed rows
+    (4xx/5xx/timeout) get a shorter one applied by the caller.
+
+    We can't store the canonical form on the posts table without a
+    migration, so we compute it on the fly via the existing
+    `external_uri` column. That's bounded by the active post window
+    (~24h) so the candidate set is small.
+    """
+    # Lazy-import to avoid the urls↔db cycle at module load
+    from .urls import canonicalize_url
+    conn = get_conn()
+    try:
+        # Distinct posts.external_uri from recent window
+        rows = conn.execute(
+            "SELECT DISTINCT external_uri FROM posts "
+            "WHERE external_uri IS NOT NULL AND external_uri != '' "
+            "  AND created_at >= datetime('now', '-2 days') "
+            "LIMIT 2000"
+        ).fetchall()
+        existing_meta = {
+            row["canonical_url"]: row["fetched_at"]
+            for row in conn.execute(
+                "SELECT canonical_url, fetched_at FROM url_metadata"
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+
+    cutoff_iso = (
+        timeutil.now_utc().timestamp() - max_age_hours * 3600
+    )
+
+    needs: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        raw = row[0] if not hasattr(row, "keys") else row["external_uri"]
+        canonical = canonicalize_url(raw)
+        if not canonical or canonical in seen:
+            continue
+        seen.add(canonical)
+        last_fetched_iso = existing_meta.get(canonical)
+        if last_fetched_iso is None:
+            needs.append(canonical)
+        else:
+            try:
+                last_ts = timeutil.to_utc_datetime(last_fetched_iso).timestamp()
+            except Exception:
+                needs.append(canonical)
+                continue
+            if last_ts < cutoff_iso:
+                needs.append(canonical)
+        if len(needs) >= limit:
+            break
+    return needs
 
 
 def get_excluded_dids() -> set[str]:

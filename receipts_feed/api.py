@@ -35,9 +35,12 @@ _rank_task: asyncio.Task | None = None
 _edition_task: asyncio.Task | None = None
 _dm_task: asyncio.Task | None = None
 _graph_task: asyncio.Task | None = None
+_og_fetch_task: asyncio.Task | None = None
 
 DM_CHECK_INTERVAL = 300  # 5 minutes
 GRAPH_REFRESH_INTERVAL = 86400  # 24 hours
+OG_FETCH_INTERVAL = 300  # 5 minutes
+OG_FETCH_BATCH_SIZE = 25
 
 
 async def _periodic_rank():
@@ -76,6 +79,24 @@ async def _periodic_graph_refresh():
         await asyncio.sleep(GRAPH_REFRESH_INTERVAL)
 
 
+async def _periodic_og_fetch():
+    """Background task: refresh url_metadata for canonical URLs referenced
+    by recent posts. Bounded by batch size + per-fetch timeout so it
+    can't starve other tasks or block the event loop."""
+    from . import og_fetch
+    loop = asyncio.get_event_loop()
+    await asyncio.sleep(45)  # let ingest warm up first
+    while True:
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: og_fetch.run_batch(batch_size=OG_FETCH_BATCH_SIZE),
+            )
+        except Exception:
+            LOG.exception("og_fetch batch failed")
+        await asyncio.sleep(OG_FETCH_INTERVAL)
+
+
 async def _periodic_edition():
     """Background task to freeze site editions on an interval."""
     loop = asyncio.get_event_loop()
@@ -111,6 +132,13 @@ async def startup():
     _graph_task = asyncio.create_task(_periodic_graph_refresh())
     LOG.info("started graph refresh (interval=%ds)", GRAPH_REFRESH_INTERVAL)
 
+    global _og_fetch_task
+    _og_fetch_task = asyncio.create_task(_periodic_og_fetch())
+    LOG.info(
+        "started OG fetcher (interval=%ds batch=%d)",
+        OG_FETCH_INTERVAL, OG_FETCH_BATCH_SIZE,
+    )
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -126,6 +154,8 @@ async def shutdown():
         _dm_task.cancel()
     if _graph_task:
         _graph_task.cancel()
+    if _og_fetch_task:
+        _og_fetch_task.cancel()
 
 
 # -- Feed skeleton endpoint --

@@ -21,59 +21,10 @@ from .domains import domain_bonus, is_platform_domain
 
 LOG = logging.getLogger("receipts.cluster")
 
-# --- URL canonicalization ---
-
-# Tracking params to strip
-_TRACKING_PARAMS = {
-    "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-    "fbclid", "gclid", "gclsrc", "ref", "ref_src", "ref_url",
-    "si", "feature", "mc_cid", "mc_eid",
-}
-
-
-def canonicalize_url(url: str) -> str:
-    """Normalize a URL for clustering: strip tracking, fragments, normalize host."""
-    if not url:
-        return ""
-    try:
-        parsed = urlparse(url)
-        host = (parsed.hostname or "").lower()
-        if host.startswith("www."):
-            host = host[4:]
-        # Strip tracking params
-        if parsed.query:
-            params = parse_qs(parsed.query, keep_blank_values=False)
-            cleaned = {k: v for k, v in params.items() if k.lower() not in _TRACKING_PARAMS}
-            query = urlencode(cleaned, doseq=True) if cleaned else ""
-        else:
-            query = ""
-        # Normalize mobile YouTube
-        path = parsed.path
-        if host in ("youtube.com", "m.youtube.com", "youtu.be"):
-            host = "youtube.com"
-            if host == "youtu.be" or path.startswith("/shorts/"):
-                # Extract video ID
-                vid = path.split("/")[-1] if "/" in path else path
-                if parsed.query:
-                    v_param = parse_qs(parsed.query).get("v", [])
-                    if v_param:
-                        vid = v_param[0]
-                path = f"/watch"
-                query = f"v={vid}" if vid else query
-        # Rebuild without fragment
-        scheme = parsed.scheme or "https"
-        port = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
-        canonical = f"{scheme}://{host}{port}{path}"
-        if query:
-            canonical += f"?{query}"
-        return canonical
-    except Exception:
-        return url
-
-
-def _url_key(url: str) -> str:
-    """Generate a short hash key from a canonical URL."""
-    return hashlib.sha256(url.encode()).hexdigest()[:16]
+# URL canonicalization + key helpers moved to .urls so the OG fetcher and
+# the story-card renderer can share one implementation. Re-exported here
+# for backward compatibility with existing callers in this module.
+from .urls import canonicalize_url, url_key as _url_key  # noqa: F401
 
 
 # Stopwords for title normalization
@@ -238,6 +189,14 @@ def build_clusters(ranked_posts: list[dict], post_details: dict[str, dict]) -> l
         title_clusters.append(cluster)
 
     # Phase 3: Singletons (everything unclaimed)
+    #
+    # Source-first pivot (2026-06-10): even when a post is a singleton
+    # (no other posts in the window link the same URL), if it HAS a
+    # canonical URL the render path should treat that URL as the story
+    # and the post as commentary. Without this, every single-link post
+    # fell through to "graph_note" headline_basis and lost the URL
+    # metadata lookup. The cluster_type stays "singleton" — the new
+    # canonical_url field is just context for the renderer.
     singleton_clusters = []
     for r in ranked_posts:
         if r["uri"] in claimed:
@@ -245,10 +204,15 @@ def build_clusters(ranked_posts: list[dict], post_details: dict[str, dict]) -> l
         post = post_details.get(r["uri"])
         if not post:
             continue
+        canonical = None
+        ext_url = post.get("external_uri")
+        if ext_url and not is_platform_domain(post.get("external_domain")):
+            canonical = canonicalize_url(ext_url) or None
         cluster = _build_cluster(
             cluster_type="singleton",
             cluster_key=hashlib.sha256(r["uri"].encode()).hexdigest()[:16],
             members=[{**r, "_post": post}],
+            canonical_url=canonical,
         )
         singleton_clusters.append(cluster)
 

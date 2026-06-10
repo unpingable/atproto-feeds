@@ -36,6 +36,24 @@ def main():
     # debug
     sub.add_parser("top", help="Show top ranked posts (debug)")
 
+    # one-shot OG / source metadata fetch — useful for backfill + debug
+    og_p = sub.add_parser(
+        "og-fetch",
+        help="Fetch og: metadata for canonical URLs needing refresh",
+    )
+    og_p.add_argument(
+        "--batch-size", type=int, default=25,
+        help="Max URLs to fetch in one run (default 25)",
+    )
+    og_p.add_argument(
+        "--url",
+        help="Fetch this single URL (canonicalizes first); ignores --batch-size",
+    )
+    og_p.add_argument(
+        "--timeout", type=float, default=6.0,
+        help="Per-fetch timeout seconds (default 6.0)",
+    )
+
     # semantic feed health check (cron-friendly; nonzero exit on degraded/failed)
     health_p = sub.add_parser(
         "health",
@@ -92,6 +110,22 @@ def main():
             description=args.description,
         )
         print(f"Published: {result}")
+
+    elif args.cmd == "og-fetch":
+        import json as _json
+        from . import db, og_fetch
+        from .urls import canonicalize_url
+        db.init_db()
+        if args.url:
+            canonical = canonicalize_url(args.url)
+            result = og_fetch.fetch_and_store(canonical, timeout=args.timeout)
+            print(_json.dumps(result, indent=2))
+        else:
+            summary = og_fetch.run_batch(
+                batch_size=args.batch_size,
+                per_fetch_timeout=args.timeout,
+            )
+            print(_json.dumps(summary, indent=2))
 
     elif args.cmd == "health":
         import json as _json
