@@ -270,30 +270,51 @@ def _apply_composition_rules(scored: list[dict], page_size: int) -> list[dict]:
 
 
 def run_rank():
-    """Score all recent posts and materialize ranked_posts table."""
+    """Score all recent posts and materialize ranked_posts table.
+
+    Emits per-stage timing logs so the 75s tail observed during the
+    May 30 contention can be attributed to a specific stage. Set
+    LABEL_RANK_PROFILE=1 to also dump EXPLAIN QUERY PLAN for the slow
+    queries on the next run.
+    """
+    import time as _t
+    rank_start = _t.perf_counter()
+    stage_times: dict[str, float] = {}
+
+    def _stage(name: str, fn, *args, **kwargs):
+        t0 = _t.perf_counter()
+        out = fn(*args, **kwargs)
+        dt_ms = (_t.perf_counter() - t0) * 1000.0
+        stage_times[name] = dt_ms
+        return out
+
     LOG.info("starting rank pass")
 
-    posts = db.get_recent_posts(hours=config.MAX_FEED_AGE_HOURS)
+    posts = _stage("get_recent_posts", db.get_recent_posts,
+                   hours=config.MAX_FEED_AGE_HOURS)
     if not posts:
         LOG.info("no posts to rank")
         return
 
     # Update author post counts and stink scores
-    db.update_author_post_counts()
+    _stage("update_author_post_counts", db.update_author_post_counts)
     try:
-        db.compute_author_stink_scores()
+        _stage("compute_author_stink_scores", db.compute_author_stink_scores)
     except Exception:
         LOG.exception("stink score computation failed (non-fatal)")
 
     # Load exclusions
-    excluded = db.get_excluded_dids()
+    excluded = _stage("get_excluded_dids", db.get_excluded_dids)
 
     # Score each post
+    t_score_start = _t.perf_counter()
+    author_lookups = 0
     scored = []
     for post in posts:
         if post["author_did"] in excluded:
             continue
         author = db.get_author(post["author_did"])
+        author_lookups += 1
         score, reasons = score_post(post, author)
         scored.append({
             "uri": post["uri"],
@@ -301,18 +322,38 @@ def run_rank():
             "reasons": reasons,
             "post": post,
         })
+    stage_times["score_loop"] = (_t.perf_counter() - t_score_start) * 1000.0
+    stage_times["_author_lookups_count"] = author_lookups  # not a timing
 
     # Sort by score descending
     scored.sort(key=lambda x: x["score"], reverse=True)
 
     # Apply composition rules for a generous buffer
-    composed = _apply_composition_rules(scored, page_size=config.FEED_PAGE_SIZE * 5)
+    composed = _stage("_apply_composition_rules", _apply_composition_rules,
+                      scored, page_size=config.FEED_PAGE_SIZE * 5)
 
     # Save to DB
     ranked = [{"uri": item["uri"], "score": item["score"], "reasons": item["reasons"]} for item in composed]
-    db.save_ranked_posts("receipts", ranked)
-
-    LOG.info("ranked %d posts (from %d candidates)", len(ranked), len(posts))
+    _stage("save_ranked_posts", db.save_ranked_posts, "receipts", ranked)
 
     # Purge stale posts
-    db.purge_old_posts(hours=config.MAX_FEED_AGE_HOURS * 2)
+    _stage("purge_old_posts", db.purge_old_posts,
+           hours=config.MAX_FEED_AGE_HOURS * 2)
+
+    total_ms = (_t.perf_counter() - rank_start) * 1000.0
+    LOG.info("ranked %d posts (from %d candidates)", len(ranked), len(posts))
+    LOG.info(
+        "RANK PROFILE total=%.0fms candidates=%d author_lookups=%d "
+        "stages: get_recent_posts=%.0fms update_author_post_counts=%.0fms "
+        "compute_author_stink_scores=%.0fms get_excluded_dids=%.0fms "
+        "score_loop=%.0fms composition=%.0fms save_ranked=%.0fms purge=%.0fms",
+        total_ms, len(posts), author_lookups,
+        stage_times.get("get_recent_posts", -1),
+        stage_times.get("update_author_post_counts", -1),
+        stage_times.get("compute_author_stink_scores", -1),
+        stage_times.get("get_excluded_dids", -1),
+        stage_times.get("score_loop", -1),
+        stage_times.get("_apply_composition_rules", -1),
+        stage_times.get("save_ranked_posts", -1),
+        stage_times.get("purge_old_posts", -1),
+    )
