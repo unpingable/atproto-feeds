@@ -55,10 +55,16 @@
     {% if claim_ledger_enabled %}
     <h2>Receipts: Claims With Receipts, Not Verdicts</h2>
     <p>
-        The <strong>Receipts</strong> section takes the &ldquo;does not verify
-        truth&rdquo; stance and makes it structural. It compiles a post into a
-        claim only when the post carries a citable external source with resolved
-        custody &mdash; then shows the receipt (seal, basis, freshness) and says
+        <strong>Receipts</strong> is this project's evidence surface &mdash; the
+        ranking engine described above, and the claim ledger built on top of it.
+        The claim ledger is the next compiled object <em>inside</em> Receipts, not
+        a new institution: separate lens, same substrate.
+    </p>
+    <p>
+        It takes the &ldquo;does not verify truth&rdquo; stance and makes it
+        structural. It compiles a post into a claim only when the post carries a
+        citable external source with resolved custody &mdash; then shows the
+        receipt (seal, basis, freshness) and says
         <strong>&ldquo;Truth: unknown.&rdquo;</strong> The weight it reports is
         admissibility, not truth and not popularity. It is never a verdict about
         the subject of a claim. Posts that carry no source don't compile; they're
