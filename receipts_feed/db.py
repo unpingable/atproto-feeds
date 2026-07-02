@@ -454,6 +454,31 @@ def get_ranked_posts(feed_name: str, limit: int = 30, cursor_score: Optional[flo
     return [{"uri": r[0], "score": r[1], "reasons": json.loads(r[2])} for r in rows]
 
 
+def get_ranked_posts_with_domain(
+    feed_name: str, limit: int = 30, cursor_score: Optional[float] = None
+) -> list[dict]:
+    """Like get_ranked_posts but joins the post's external_domain, for the
+    Receipts: Sourced feed's live structural gate."""
+    conn = get_conn()
+    sql = (
+        "SELECT rp.uri, rp.score, rp.reasons_json, p.external_domain "
+        "FROM ranked_posts rp LEFT JOIN posts p ON p.uri = rp.uri "
+        "WHERE rp.feed_name = ? {extra} ORDER BY rp.score DESC LIMIT ?"
+    )
+    if cursor_score is not None:
+        rows = conn.execute(
+            sql.format(extra="AND rp.score < ?"),
+            (feed_name, cursor_score, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(sql.format(extra=""), (feed_name, limit)).fetchall()
+    conn.close()
+    return [
+        {"uri": r[0], "score": r[1], "reasons": json.loads(r[2]), "external_domain": r[3]}
+        for r in rows
+    ]
+
+
 def update_author_post_counts():
     conn = get_conn()
     cutoff = (timeutil.now_utc() - __import__("datetime").timedelta(hours=24)).isoformat()

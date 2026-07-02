@@ -14,6 +14,7 @@ from .ingest import JetstreamConsumer
 from .rank import run_rank
 from .dm_listener import check_dms
 from .feed_dedup import dedup_feed
+from .claimdoc import carries_settleable_source
 from .graph import refresh_graph
 from .site import router as site_router, build_and_freeze_edition
 
@@ -161,8 +162,9 @@ async def shutdown():
 # -- Feed skeleton endpoint --
 
 FEED_URIS = {
-    "receipts": "live",       # Live post-level ranking with dedup
-    "edition": "edition",     # Frozen edition — cluster-level, cleaner
+    "receipts": "live",              # Live post-level ranking with dedup
+    "edition": "edition",            # Frozen edition — cluster-level, cleaner
+    "receipts-sourced": "sourced",   # Strict structural lens: posts pointing at a citable source
 }
 
 
@@ -200,6 +202,27 @@ async def get_feed_skeleton(
         page = post_items[start:start + limit]
         feed_items = [{"post": item["uri"]} for item in page if item.get("uri")]
         next_cursor = str(start + limit) if start + limit < len(post_items) else None
+        return {"cursor": next_cursor, "feed": feed_items}
+
+    if feed_mode == "sourced":
+        # Strict structural lens: only posts pointing at a citable source
+        # (external, non-platform, settleable class). Live-safe — no fetch
+        # dependency. Separate lens, same substrate; the main feed still
+        # carries graph discourse. Fetch extra since most posts won't pass.
+        cursor_score = None
+        if cursor:
+            try:
+                cursor_score = float(cursor)
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "BadCursor", "message": "Invalid cursor"},
+                )
+        ranked = db.get_ranked_posts_with_domain("receipts", limit=limit * 4, cursor_score=cursor_score)
+        ranked = [r for r in ranked if carries_settleable_source(r.get("external_domain"))]
+        ranked = dedup_feed(ranked, limit=limit)
+        feed_items = [{"post": r["uri"]} for r in ranked]
+        next_cursor = str(ranked[-1]["score"]) if ranked and len(ranked) == limit else None
         return {"cursor": next_cursor, "feed": feed_items}
 
     # Live feed: post-level ranking with dedup

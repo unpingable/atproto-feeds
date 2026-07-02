@@ -28,6 +28,7 @@ from receipts_feed.claimdoc import (
     STRONG_MODES,
     ClaimDoc,
     Rejection,
+    carries_settleable_source,
     compile_claim,
     seal_digest,
 )
@@ -261,6 +262,23 @@ class TestFailureTaxonomy:
             _meta(domain="example.com"), now=NOW)
         assert isinstance(rej, Rejection)
         assert rej.failure_class == FAILURE_CLASS_STRUCTURAL
+
+
+class TestCarriesSettleableSource:
+    def test_settleable_domains_true(self):
+        assert carries_settleable_source("reuters.com")        # wire
+        assert carries_settleable_source("courtlistener.com")  # filing
+        assert carries_settleable_source("arxiv.org")          # paper
+        assert carries_settleable_source("nytimes.com")        # reporting
+
+    def test_platform_false(self):
+        assert not carries_settleable_source("bsky.app")
+        assert not carries_settleable_source("twitter.com")
+
+    def test_unknown_and_empty_false(self):
+        assert not carries_settleable_source("randomblog.example")
+        assert not carries_settleable_source(None)
+        assert not carries_settleable_source("")
 
 
 class TestToDict:

@@ -30,6 +30,7 @@ from .source_class import (
     SOURCE_CLASS_REGULATION,
     SOURCE_CLASS_REPORTING,
     SOURCE_CLASS_WIRE,
+    classify_domain,
 )
 
 # --- claim modes (claimdocs vocabulary) ------------------------------------
@@ -151,6 +152,22 @@ def _failure_class(basis_failure: str) -> str:
     if basis_failure in _STRUCTURAL_FAILURES:
         return FAILURE_CLASS_STRUCTURAL
     return FAILURE_CLASS_TOOLING
+
+
+def carries_settleable_source(external_domain: str | None) -> bool:
+    """Live structural gate for the Receipts: Sourced feed.
+
+    True if the post points at a citable source — an external, non-platform
+    domain of a settleable class. Computed from the domain alone (no
+    url_metadata / fetch dependency), so it's safe at feed-serve time. This is
+    the compile predicate MINUS the custody (fetch_status==200) check: it does
+    not claim custody, only that the post points at something citable.
+    """
+    if not external_domain:
+        return False
+    if _domains.is_platform_domain(external_domain):
+        return False
+    return classify_domain(external_domain) in SETTLEABLE_CLASSES
 
 
 @dataclass(frozen=True)
