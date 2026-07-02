@@ -1,0 +1,33 @@
+{# Claim card — fail-closed. Renders the strong claim (with receipts) ONLY if
+   the mode is sourced/reported AND its basis resolved. Otherwise it degrades to
+   the carrier "title unverified" form — the source never wears a headline it
+   couldn't back. "Truth: unknown." is structural, not decorative. #}
+{% set c = item.claim %}
+{% if c and c.claim_mode in ["sourced", "reported"] and c.basis_resolved %}
+<article class="iin-claim">
+  <span class="iin-stamp" data-cls="{{ item.source_class }}">
+    <span class="cls">{{ c.claim_mode | title }}</span>
+    {% if item.source_domain %} · <span class="dom">{{ item.source_domain }}</span>{% endif %}
+  </span>
+  <h3>
+    <a href="{{ item.display_url or item.external_uri or item.web_url }}" rel="noopener"{% if item.display_url or item.external_uri %} target="_blank"{% endif %}>
+      {{ item.display_headline or item.text }}
+    </a>
+  </h3>
+  {% if item.dek_quote and excerpt_ok(item.display_headline, item.dek_quote) %}
+  <p class="iin-dek">{{ trunc(item.dek_quote, 200) }}
+    {% if item.author_handle %}<cite>— @{{ item.author_handle }}</cite>{% endif %}
+  </p>
+  {% endif %}
+  <div class="iin-receipts">
+    <span class="ok">compile ✓</span> · seal {{ c.seal_digest }} · basis {{ c.basis_kind | replace("_", " ") }} · freshness {{ c.freshness }} · <b>Truth: unknown.</b>
+  </div>
+</article>
+{% else %}
+<article class="iin-claim carrier">
+  <h3 class="unverified">
+    <span>{{ item.source_domain or item.display_headline or item.text }}</span>
+    <span class="tag">title unverified</span>
+  </h3>
+</article>
+{% endif %}

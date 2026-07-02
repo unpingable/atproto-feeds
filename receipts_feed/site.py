@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import claim_ledger, config, db, timeutil
+from .claimdoc import STRONG_MODES
 from .domains import is_platform_domain
 from .business import is_business_relevant
 from .sports import is_sports_relevant
@@ -661,6 +662,22 @@ def _build_desk(limit: int = 10) -> list[dict]:
     return items[:limit]
 
 
+def _collect_claims(items: list[dict]) -> list[dict]:
+    """Strong-mode claim cards for the Receipts section (fail-closed).
+
+    Only claims whose basis resolved (sourced/reported). A stamp-only view over
+    the same items, ordered by admissibility desc. Carrier/uncompiled items go
+    to the negative surface, not here.
+    """
+    claims = [
+        it for it in items
+        if (it.get("claim") or {}).get("claim_mode") in STRONG_MODES
+        and (it.get("claim") or {}).get("basis_resolved")
+    ]
+    claims.sort(key=lambda it: (it.get("claim") or {}).get("admissibility", 0.0), reverse=True)
+    return claims
+
+
 # --- Routes ---
 
 @router.get("/", response_class=HTMLResponse)
@@ -720,6 +737,8 @@ async def homepage(request: Request):
         "sections": groups["main"],
         "wire_ticker": wire_ticker,
         "below_fold": below_fold,
+        # Claim ledger (dark by default) — empty list renders nothing.
+        "claims": _collect_claims(items) if config.CLAIM_LEDGER_ENABLED else [],
     })
 
 

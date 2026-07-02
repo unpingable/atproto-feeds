@@ -114,6 +114,27 @@ body a:hover{text-decoration:underline; text-decoration-thickness:1px; text-unde
 .iin-stamp[data-cls="wire_blip"] .cls{color:var(--wire)}
 .iin-stamp .dom{color:var(--ink-faint)}
 
+/* ── RECEIPTS / claim ledger ──────────────────────────────── */
+.iin-claim{padding:.65rem 0; border-bottom:1px solid var(--rule)}
+.iin-claim h3{margin:.15rem 0 .35rem; font-size:1.08rem; line-height:1.25}
+.iin-claim h3 a{color:var(--ink)}
+.iin-claim h3 a:hover{color:var(--amber)}
+.iin-receipts{
+  font-family:var(--mono-iin); font-size:11px; letter-spacing:.04em;
+  color:var(--ink-faint);
+}
+.iin-receipts .ok{color:var(--reporting)}
+.iin-receipts b{color:var(--ink-dim); font-weight:600}
+.iin-claim.carrier .unverified{
+  font-weight:400; font-size:.95rem; color:var(--ink-faint);
+  display:flex; gap:.5rem; align-items:baseline;
+}
+.iin-claim .tag{
+  font-family:var(--mono-iin); font-size:9.5px; color:var(--wire);
+  border:1px solid var(--rule); padding:0 .35rem; border-radius:3px;
+  text-transform:uppercase; letter-spacing:.1em;
+}
+
 .iin-story h3{
   font-family:var(--serif-iin); font-weight:600;
   font-size:21px; line-height:1.18; letter-spacing:-.01em;
@@ -265,6 +286,12 @@ body a:hover{text-decoration:underline; text-decoration-thickness:1px; text-unde
 
   <main class="iin-main">
   {% set ns = namespace(lead_used=False) %}
+
+  {% if claims %}
+    <div class="iin-section">Receipts <span class="count">/ {{ claims|length }} · claims with receipts, not verdicts</span></div>
+    {% for item in claims %}{% include "_claim_card.html" %}{% endfor %}
+  {% endif %}
+
   {% for section in sections %}
     <div class="iin-section">{{ section.label }} <span class="count">/ {{ section.stories|length }} item{{ "" if section.stories|length == 1 else "s" }}</span></div>
 
