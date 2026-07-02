@@ -38,7 +38,7 @@ import urllib.request
 from typing import Optional
 from urllib.parse import urljoin
 
-from . import db, source_class as source_class_mod
+from . import db, handlers, source_class as source_class_mod
 from .urls import canonicalize_url, extract_domain
 
 LOG = logging.getLogger("receipts.og_fetch")
@@ -213,8 +213,23 @@ def fetch_and_store(canonical_url: str, *, timeout: float = FETCH_TIMEOUT_SECOND
 
     Resolves source_class from `final_url`'s domain so a 301 from a vanity
     host to a known publisher is classified correctly.
+
+    A registered domain handler runs first (coverage expansion for sources that
+    block a naive fetch but expose a free API). If it can't resolve, the generic
+    fetch runs and records whatever it gets.
     """
-    result = _fetch_url(canonical_url, timeout=timeout)
+    result = None
+    handler = handlers.get_handler(extract_domain(canonical_url) or "")
+    if handler is not None:
+        try:
+            result = handler(canonical_url, timeout=timeout)
+            if result is not None:
+                LOG.info("handler resolved %s", canonical_url)
+        except Exception:
+            LOG.exception("handler error for %s (falling back to generic fetch)", canonical_url)
+            result = None
+    if result is None:
+        result = _fetch_url(canonical_url, timeout=timeout)
     final_url = result["final_url"] or canonical_url
     domain = extract_domain(final_url) or extract_domain(canonical_url) or ""
     sc = source_class_mod.classify_domain(domain)
