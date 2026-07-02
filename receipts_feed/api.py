@@ -346,6 +346,33 @@ async def debug_stats():
     }
 
 
+@app.get("/debug/claims")
+async def debug_claims():
+    """Debug endpoint: compiled claimdocs for the latest edition, grouped by mode.
+
+    Lets the operator audit compile behavior (mode mix, admissibility) before
+    any decision to promote the Receipts section. Empty unless CLAIM_LEDGER_ENABLED.
+    """
+    latest = db.get_latest_edition("receipts")
+    if not latest:
+        return {"edition_id": None, "counts": {}, "claims": {}, "rejections": []}
+    edition_id = latest["edition_id"]
+    docs = db.get_claimdocs_for_edition(edition_id)
+    rejections = db.get_claim_rejections_for_edition(edition_id)
+    by_mode: dict[str, list] = {}
+    for d in docs:
+        by_mode.setdefault(d["claim_mode"], []).append(d)
+    counts = {mode: len(v) for mode, v in by_mode.items()}
+    counts["rejected"] = len(rejections)
+    return {
+        "edition_id": edition_id,
+        "total": len(docs),
+        "counts": counts,
+        "claims": by_mode,
+        "rejections": rejections,
+    }
+
+
 @app.post("/debug/refresh-graph")
 async def debug_refresh_graph():
     """Debug endpoint: trigger manual graph refresh."""

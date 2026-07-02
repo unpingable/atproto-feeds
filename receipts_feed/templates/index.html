@@ -364,6 +364,22 @@ body a:hover{text-decoration:underline; text-decoration-thickness:1px; text-unde
     </div>
   </section>
   {% endif %}
+
+  {% if uncompiled %}
+  <section class="iin-belowfold iin-uncompiled">
+    <div class="iin-section">Uncompiled / No Receipts <span class="count">/ {{ uncompiled|length }}</span></div>
+    <div class="iin-bf-grid">
+      {% for u in uncompiled %}
+      <div class="iin-bf-item">
+        <div class="t">
+          {% if u.display_url or u.web_url %}<a href="{{ u.display_url or u.web_url }}" rel="noopener"{% if u.display_url %} target="_blank"{% endif %}>{{ u.headline or u.source_domain }}</a>{% else %}{{ u.headline or u.source_domain }}{% endif %}
+        </div>
+        <span class="a">{% if u.source_domain %}{{ u.source_domain }} · {% endif %}<span class="tag">{{ u.reason }}</span></span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
   </main>
 
   <aside class="iin-rail">

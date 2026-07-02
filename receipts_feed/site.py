@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import claim_ledger, config, db, timeutil
-from .claimdoc import STRONG_MODES
+from .claimdoc import REJECT_REASONS, STRONG_MODES
 from .domains import is_platform_domain
 from .business import is_business_relevant
 from .sports import is_sports_relevant
@@ -678,6 +678,34 @@ def _collect_claims(items: list[dict]) -> list[dict]:
     return claims
 
 
+def _collect_uncompiled(items: list[dict]) -> list[dict]:
+    """The negative surface: items that did not compile into a strong claim.
+
+    Carrier / uncompiled claimdocs + hard rejections. Each row carries an
+    honest, structural reason ("No primary source", "Source unreachable", ...) —
+    never a verdict about the subject.
+    """
+    rows: list[dict] = []
+    for it in items:
+        claim = it.get("claim") or {}
+        rej = it.get("claim_rejection") or {}
+        mode = claim.get("claim_mode")
+        if mode in ("carrier", "uncompiled"):
+            reason = REJECT_REASONS.get(claim.get("reject_code")) or mode.title()
+        elif rej:
+            reason = rej.get("reject_reason") or "Did not compile"
+        else:
+            continue
+        rows.append({
+            "headline": _truncate_word(it.get("display_headline") or it.get("text", ""), 80),
+            "web_url": it.get("web_url", ""),
+            "display_url": it.get("display_url") or it.get("external_uri") or "",
+            "source_domain": it.get("source_domain") or "",
+            "reason": reason,
+        })
+    return rows
+
+
 # --- Routes ---
 
 @router.get("/", response_class=HTMLResponse)
@@ -737,8 +765,9 @@ async def homepage(request: Request):
         "sections": groups["main"],
         "wire_ticker": wire_ticker,
         "below_fold": below_fold,
-        # Claim ledger (dark by default) — empty list renders nothing.
+        # Claim ledger (dark by default) — empty lists render nothing.
         "claims": _collect_claims(items) if config.CLAIM_LEDGER_ENABLED else [],
+        "uncompiled": _collect_uncompiled(items) if config.CLAIM_LEDGER_ENABLED else [],
     })
 
 

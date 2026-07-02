@@ -894,6 +894,21 @@ def get_claimdocs_for_edition(edition_id: str) -> list[dict]:
     return out
 
 
+def get_claim_rejections_for_edition(edition_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT post_uri, canonical_url, reject_code, reject_reason, evaluated_at "
+        "FROM claim_rejections WHERE edition_id = ?",
+        (edition_id,),
+    ).fetchall()
+    conn.close()
+    return [
+        {"post_uri": r[0], "canonical_url": r[1], "reject_code": r[2],
+         "reject_reason": r[3], "evaluated_at": r[4]}
+        for r in rows
+    ]
+
+
 def get_latest_edition(feed_name: str) -> Optional[dict]:
     conn = get_conn()
     row = conn.execute(
