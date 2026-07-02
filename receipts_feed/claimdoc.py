@@ -85,11 +85,13 @@ FAIL_NOT_SETTLEABLE = "not_settleable_source"   # structural: source class isn't
 FAIL_SOURCE_BLOCKED = "source_blocked"          # tooling: paywall/policy block (401/403/429)
 FAIL_HANDLER_MISSING = "handler_missing"        # tooling: block on a handleable public record — fixable
 FAIL_FETCH_ERROR = "fetch_error"                # tooling: other non-200 (404/5xx/...)
-FAIL_FETCH_UNREACHABLE = "fetch_unreachable"    # tooling: network failure / not fetched yet
+FAIL_FETCH_UNREACHABLE = "fetch_unreachable"    # tooling: fetched, network failure
+FAIL_FETCH_PENDING = "fetch_pending"            # tooling: not fetched yet (no metadata row)
 
 _STRUCTURAL_FAILURES = frozenset({FAIL_NO_PRIMARY_SOURCE, FAIL_NOT_SETTLEABLE})
 _TOOLING_FAILURES = frozenset({
-    FAIL_SOURCE_BLOCKED, FAIL_HANDLER_MISSING, FAIL_FETCH_ERROR, FAIL_FETCH_UNREACHABLE,
+    FAIL_SOURCE_BLOCKED, FAIL_HANDLER_MISSING, FAIL_FETCH_ERROR,
+    FAIL_FETCH_UNREACHABLE, FAIL_FETCH_PENDING,
 })
 
 FAILURE_CLASS_STRUCTURAL = "structural"  # the claim genuinely lacks a citable source
@@ -103,6 +105,7 @@ BASIS_FAILURE_REASONS = {
     FAIL_HANDLER_MISSING: "Fetch blocked — handler missing (fixable)",
     FAIL_FETCH_ERROR: "Fetch error",
     FAIL_FETCH_UNREACHABLE: "Source unreachable",
+    FAIL_FETCH_PENDING: "Fetch pending",
 }
 
 # Citation-native / public-record domains where a source handler is feasible.
@@ -131,7 +134,7 @@ def _basis_failure(url_meta: dict | None, source_domain: str) -> str:
     """Classify WHY a carrier's basis didn't resolve. Never returns a
     structural code — those are set at the E004/E006 sites."""
     if not url_meta:
-        return FAIL_FETCH_UNREACHABLE  # no row yet — not reached
+        return FAIL_FETCH_PENDING  # no metadata row yet — we haven't looked
     status = url_meta.get("fetch_status")
     if status == 200:
         return FAIL_NONE

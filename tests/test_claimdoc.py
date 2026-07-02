@@ -33,6 +33,7 @@ from receipts_feed.claimdoc import (
 )
 from receipts_feed.claimdoc import (
     FAIL_FETCH_ERROR,
+    FAIL_FETCH_PENDING,
     FAIL_FETCH_UNREACHABLE,
     FAIL_HANDLER_MISSING,
     FAIL_NO_PRIMARY_SOURCE,
@@ -229,8 +230,15 @@ class TestFailureTaxonomy:
         assert doc.failure_class == FAILURE_CLASS_TOOLING
 
     def test_network_fail_is_unreachable(self):
+        # Has a metadata row, status None -> we fetched and failed.
         doc = compile_claim(_item(), _meta(fetch_status=None), now=NOW)
         assert doc.basis_failure == FAIL_FETCH_UNREACHABLE
+
+    def test_no_metadata_is_pending(self):
+        # No metadata row -> we haven't looked yet (not "unreachable").
+        doc = compile_claim(_item(), None, now=NOW)
+        assert doc.basis_failure == FAIL_FETCH_PENDING
+        assert doc.failure_class == FAILURE_CLASS_TOOLING
 
     def test_other_status_is_fetch_error(self):
         doc = compile_claim(_item(), _meta(fetch_status=404), now=NOW)
