@@ -71,3 +71,30 @@ class TestFetchAndStoreDispatch:
         monkeypatch.setattr(og_fetch.db, "upsert_url_metadata", lambda cu, **kw: None)
         out = og_fetch.fetch_and_store("https://x.com/a", timeout=6)
         assert out["og_title"] == "G"
+
+
+class TestInterstitial:
+    def test_detected_by_host(self):
+        assert og_fetch._is_interstitial("https://unblock.federalregister.gov/x", "anything")
+
+    def test_detected_by_title(self):
+        assert og_fetch._is_interstitial("https://www.federalregister.gov/x",
+                                         "Federal Register :: Request Access")
+        assert og_fetch._is_interstitial("https://x.com/y", "Just a moment...")
+
+    def test_clean_page_not_interstitial(self):
+        assert not og_fetch._is_interstitial("https://reuters.com/x", "A Real Headline")
+
+    def test_fetch_and_store_demotes_false_200(self, monkeypatch):
+        monkeypatch.setattr(og_fetch.handlers, "get_handler", lambda d: None)
+        monkeypatch.setattr(og_fetch, "_fetch_url", lambda *a, **k: {
+            "final_url": "https://unblock.federalregister.gov/x", "content_type": "text/html",
+            "fetch_status": 200, "fetch_error": None,
+            "og_title": "Federal Register :: Request Access",
+            "og_description": None, "og_image": None})
+        captured = {}
+        monkeypatch.setattr(og_fetch.db, "upsert_url_metadata", lambda cu, **kw: captured.update(kw))
+        og_fetch.fetch_and_store("https://www.federalregister.gov/documents/x", timeout=6)
+        assert captured["fetch_status"] == 403          # demoted from the false 200
+        assert captured["fetch_error"] == "interstitial"
+        assert captured["og_title"] is None             # denied title dropped

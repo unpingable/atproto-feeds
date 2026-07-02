@@ -56,6 +56,25 @@ MAX_RESPONSE_BYTES = 256 * 1024  # 256 KB — plenty for <head>
 FETCH_TIMEOUT_SECONDS = 6.0
 
 
+# Access-denied / interstitial pages that return HTTP 200 but are NOT the
+# source (e.g. federalregister.gov's "Request Access" wall). Without this an
+# access-denied page compiles with custody it doesn't have — compile ✓ on a
+# locked door. Demote to a blocked fetch so the ledger reads it as a coverage gap.
+_INTERSTITIAL_HOSTS = {"unblock.federalregister.gov"}
+_ACCESS_DENIED_TITLE_RE = re.compile(
+    r"request access|access denied|just a moment|attention required|"
+    r"are you (?:a )?human|verify you are (?:a )?human|enable javascript|captcha",
+    re.IGNORECASE,
+)
+
+
+def _is_interstitial(final_url: str | None, title: str | None) -> bool:
+    host = (extract_domain(final_url) or "") if final_url else ""
+    if host in _INTERSTITIAL_HOSTS:
+        return True
+    return bool(title and _ACCESS_DENIED_TITLE_RE.search(title))
+
+
 # ---------------------------------------------------------------------------
 # OG / title extraction
 # ---------------------------------------------------------------------------
@@ -231,6 +250,14 @@ def fetch_and_store(canonical_url: str, *, timeout: float = FETCH_TIMEOUT_SECOND
     if result is None:
         result = _fetch_url(canonical_url, timeout=timeout)
     final_url = result["final_url"] or canonical_url
+    # An access-denied interstitial is not custody. Demote a false 200 so the
+    # compiler treats it as blocked (coverage gap), never a resolved source.
+    if result.get("fetch_status") == 200 and _is_interstitial(final_url, result.get("og_title")):
+        LOG.info("interstitial (not custody): %s", canonical_url)
+        result["fetch_status"] = 403
+        result["fetch_error"] = "interstitial"
+        result["og_title"] = None
+        result["og_description"] = None
     domain = extract_domain(final_url) or extract_domain(canonical_url) or ""
     sc = source_class_mod.classify_domain(domain)
     db.upsert_url_metadata(
