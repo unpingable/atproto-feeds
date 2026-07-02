@@ -23,6 +23,10 @@ CURSOR_SAVE_INTERVAL = int(os.getenv("CURSOR_SAVE_INTERVAL", "500"))
 
 EDITION_INTERVAL_SECONDS = int(os.getenv("EDITION_INTERVAL_SECONDS", "900"))  # 15 min
 
+# Claim ledger (pivot #2) — dark by default. When off, no compile pass runs,
+# no claimdocs are written, and the "Receipts" claim section renders empty.
+CLAIM_LEDGER_ENABLED = os.getenv("CLAIM_LEDGER_ENABLED", "0") in ("1", "true", "True", "yes")
+
 # House accounts — for the DESK page, not the main ranking
 HOUSE_DIDS: list[str] = []  # populated at startup from handles below
 HOUSE_HANDLES: list[str] = [

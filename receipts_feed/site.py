@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from . import config, db, timeutil
+from . import claim_ledger, config, db, timeutil
 from .domains import is_platform_domain
 from .business import is_business_relevant
 from .sports import is_sports_relevant
@@ -286,6 +286,19 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     except Exception:
         LOG.exception("docket compaction failed (non-fatal)")
 
+    # Claim ledger (pivot #2) — dark by default. Stamps item["claim"] /
+    # item["claim_rejection"] additively so it lands in the frozen edition;
+    # never reorders or drops items (hero selection below is unaffected).
+    claim_docs: list[dict] = []
+    claim_rejections: list[dict] = []
+    if config.CLAIM_LEDGER_ENABLED:
+        try:
+            items, claim_docs, claim_rejections = claim_ledger.resolve_claim_basis(
+                items, url_meta_by_url
+            )
+        except Exception:
+            LOG.exception("claim basis resolution failed (non-fatal)")
+
     # Find hero: first hero-eligible item
     hero_idx = 0
     for i, item in enumerate(items):
@@ -347,6 +360,11 @@ def build_and_freeze_edition(limit: int = 30) -> str | None:
     stats["edition_num"] = edition_num
 
     edition_id = db.save_edition("receipts", items, stats, hero_idx)
+    if config.CLAIM_LEDGER_ENABLED and (claim_docs or claim_rejections):
+        try:
+            db.save_claimdocs(edition_id, claim_docs, claim_rejections)
+        except Exception:
+            LOG.exception("save_claimdocs failed (non-fatal)")
     LOG.info(
         "froze edition #%d (%s): %d items (%d url clusters, %d root clusters, %d singletons), hero=%d",
         edition_num, edition_id, len(items), url_cluster_count, root_cluster_count, singleton_count, hero_idx,

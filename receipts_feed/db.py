@@ -188,6 +188,44 @@ def init_db():
         )
     """)
 
+    # Claim ledger (pivot #2) — additive. One compiled claimdoc per item per
+    # edition. PK is (edition_id, post_uri), NOT claim_id: the same seal recurs
+    # across editions when a claim's custody is unchanged.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS claimdocs (
+            edition_id TEXT,
+            post_uri TEXT,
+            claim_id TEXT,
+            claim_mode TEXT,
+            basis_kind TEXT,
+            basis_resolved INTEGER DEFAULT 0,
+            reject_code TEXT,
+            canonical_url TEXT,
+            source_domain TEXT,
+            source_class TEXT,
+            fetch_status INTEGER,
+            fetched_at TEXT,
+            adequacy TEXT,
+            freshness TEXT,
+            seal_digest TEXT,
+            admissibility REAL DEFAULT 0,
+            text_carried TEXT,
+            compiled_at TEXT,
+            PRIMARY KEY (edition_id, post_uri)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS claim_rejections (
+            edition_id TEXT,
+            post_uri TEXT,
+            canonical_url TEXT,
+            reject_code TEXT,
+            reject_reason TEXT,
+            evaluated_at TEXT,
+            PRIMARY KEY (edition_id, post_uri)
+        )
+    """)
+
     # Indexes
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_type ON story_clusters(cluster_type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clusters_key ON story_clusters(cluster_key)")
@@ -218,6 +256,8 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_url_metadata_status "
         "ON url_metadata(fetch_status)"
     )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_claimdocs_edition ON claimdocs(edition_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_claimdocs_mode ON claimdocs(claim_mode)")
 
     conn.commit()
     conn.close()
@@ -793,6 +833,65 @@ def save_edition(feed_name: str, items: list[dict], stats: dict, hero_idx: int =
     conn.commit()
     conn.close()
     return edition_id
+
+
+_CLAIMDOC_COLS = [
+    "claim_id", "claim_mode", "basis_kind", "basis_resolved", "reject_code",
+    "canonical_url", "source_domain", "source_class", "fetch_status", "fetched_at",
+    "adequacy", "freshness", "seal_digest", "admissibility", "text_carried", "compiled_at",
+]
+
+
+def save_claimdocs(edition_id: str, docs: list[dict], rejections: list[dict]):
+    """Persist compiled claimdocs + rejections for an edition (additive).
+
+    Lifetime is tied to the editions table: after inserting, any rows whose
+    edition_id no longer exists in `editions` (pruned to the last 100) are
+    deleted, so claimdocs never outlive their edition.
+    """
+    conn = get_conn()
+    now = timeutil.now_utc().isoformat()
+    for d in docs:
+        conn.execute(
+            "INSERT OR REPLACE INTO claimdocs "
+            "(edition_id, post_uri, " + ", ".join(_CLAIMDOC_COLS) + ") "
+            "VALUES (?, ?, " + ", ".join(["?"] * len(_CLAIMDOC_COLS)) + ")",
+            (edition_id, d.get("post_uri"), *[
+                (1 if d.get("basis_resolved") else 0) if c == "basis_resolved" else d.get(c)
+                for c in _CLAIMDOC_COLS
+            ]),
+        )
+    for r in rejections:
+        conn.execute(
+            "INSERT OR REPLACE INTO claim_rejections "
+            "(edition_id, post_uri, canonical_url, reject_code, reject_reason, evaluated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (edition_id, r.get("post_uri"), r.get("canonical_url"),
+             r.get("reject_code"), r.get("reject_reason"), now),
+        )
+    # Prune orphans (editions table is capped at 100 by save_edition).
+    conn.execute("DELETE FROM claimdocs WHERE edition_id NOT IN (SELECT edition_id FROM editions)")
+    conn.execute("DELETE FROM claim_rejections WHERE edition_id NOT IN (SELECT edition_id FROM editions)")
+    conn.commit()
+    conn.close()
+
+
+def get_claimdocs_for_edition(edition_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT post_uri, " + ", ".join(_CLAIMDOC_COLS) + " FROM claimdocs "
+        "WHERE edition_id = ? ORDER BY admissibility DESC",
+        (edition_id,),
+    ).fetchall()
+    conn.close()
+    out = []
+    for row in rows:
+        d = {"post_uri": row[0]}
+        for i, c in enumerate(_CLAIMDOC_COLS, start=1):
+            d[c] = row[i]
+        d["basis_resolved"] = bool(d["basis_resolved"])
+        out.append(d)
+    return out
 
 
 def get_latest_edition(feed_name: str) -> Optional[dict]:
