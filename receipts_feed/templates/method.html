@@ -68,7 +68,10 @@
     <h2>Clustering and Representative Selection</h2>
     <p>
         Posts linking to the same URL or in the same reply thread are grouped
-        into story clusters. The site homepage shows one lead post per cluster.
+        into story clusters. The homepage is source-first: it shows one
+        <em>source object</em> per canonical URL, and the representative post
+        becomes the quote/dek about it &mdash; the URL is the story, the skeet
+        is a quote. The full commentary thread lives on the story page.
     </p>
     <p>
         Within a cluster, the lead representative is chosen by a multi-tier
@@ -83,6 +86,40 @@
         into docket cards: the best item stays as a full story, the rest are
         bundled into a summary card.
     </p>
+
+    {% if claim_ledger_enabled %}
+    <h2>Receipts: The Claim Ledger</h2>
+    <p>
+        The <strong>Receipts</strong> section is a claim ledger, not a
+        fact-checker. It asks one structural question about each item &mdash;
+        <em>does this post carry a settleable claim?</em> &mdash; and never reads
+        the post's meaning to decide. A post <strong>compiles</strong> only when
+        it structurally carries all of:
+    </p>
+    <ul>
+        <li>an <strong>assertion</strong> (the post text, carried verbatim);</li>
+        <li>an <strong>external source</strong> (a non-platform link &mdash; a filing,
+            docket, paper, code repo, or reporting outlet a reader could consult);</li>
+        <li><strong>custody</strong> over that source (a canonical URL whose metadata
+            we actually reached);</li>
+        <li>a settleable source class.</li>
+    </ul>
+    <p>
+        When it compiles, the card shows its receipts: a content-addressed
+        <em>seal</em>, the basis, and its freshness &mdash; ending in
+        <strong>&ldquo;Truth: unknown.&rdquo;</strong> The score you see is
+        <em>admissibility</em>, a structural weight. It is never truth, never
+        popularity, and never a verdict about the claim's subject.
+    </p>
+    <p>
+        Most viral posts <strong>do not compile</strong> &mdash; they carry no
+        external source, only carriage. That is not a bug: those land in
+        <em>Uncompiled / No Receipts</em> with an honest reason
+        (&ldquo;No primary source,&rdquo; &ldquo;Source unreachable&rdquo;).
+        Sometimes the most honest thing to say about a trending story is that
+        there isn't a coherent, citable claim in it yet.
+    </p>
+    {% endif %}
 
     <h2>Composition Rules</h2>
     <p>

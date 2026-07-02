@@ -155,6 +155,12 @@ unfairly buried.
 - Feed ranks posts. Homepage ranks clusters.
 - No embeddings, no NLP entity extraction, no fuzzy semantic clustering
   beyond conservative exact/near-exact keys.
+  - *2026-07-02 — stated → receipted.* This constraint is no longer only a
+    stated preference: the claim ledger's compiler (`receipts_feed/claimdoc.py`,
+    the "stupid compiler") enforces structural-only decisions in code, covered
+    by tests. It never reads a post's meaning. See
+    `specs/claim-ledger/vocabulary.md`. The line stays a constraint; it now has
+    a receipt.
 - `bsky.app` is not a source.
 - One author is not a cluster.
 - Many posts linking one URL are not many facts.

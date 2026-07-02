@@ -890,12 +890,18 @@ async def story_page(request: Request, cluster_id: str):
 
 @router.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
-    return templates.TemplateResponse("about.html", {"request": request})
+    return templates.TemplateResponse("about.html", {
+        "request": request,
+        "claim_ledger_enabled": config.CLAIM_LEDGER_ENABLED,
+    })
 
 
 @router.get("/method", response_class=HTMLResponse)
 async def method(request: Request):
-    return templates.TemplateResponse("method.html", {"request": request})
+    return templates.TemplateResponse("method.html", {
+        "request": request,
+        "claim_ledger_enabled": config.CLAIM_LEDGER_ENABLED,
+    })
 
 
 @router.get("/feed", response_class=HTMLResponse)
