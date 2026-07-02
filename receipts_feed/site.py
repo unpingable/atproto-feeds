@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import claim_ledger, config, db, timeutil
-from .claimdoc import REJECT_REASONS, STRONG_MODES
+from .claimdoc import BASIS_FAILURE_REASONS, REJECT_REASONS, STRONG_MODES
 from .domains import is_platform_domain
 from .business import is_business_relevant
 from .sports import is_sports_relevant
@@ -691,9 +691,13 @@ def _collect_uncompiled(items: list[dict]) -> list[dict]:
         rej = it.get("claim_rejection") or {}
         mode = claim.get("claim_mode")
         if mode in ("carrier", "uncompiled"):
-            reason = REJECT_REASONS.get(claim.get("reject_code")) or mode.title()
+            bf = claim.get("basis_failure") or ""
+            reason = (BASIS_FAILURE_REASONS.get(bf)
+                      or REJECT_REASONS.get(claim.get("reject_code")) or mode.title())
+            fclass = claim.get("failure_class") or "tooling"
         elif rej:
             reason = rej.get("reject_reason") or "Did not compile"
+            fclass = rej.get("failure_class") or "structural"
         else:
             continue
         rows.append({
@@ -702,7 +706,10 @@ def _collect_uncompiled(items: list[dict]) -> list[dict]:
             "display_url": it.get("display_url") or it.get("external_uri") or "",
             "source_domain": it.get("source_domain") or "",
             "reason": reason,
+            "failure_class": fclass,
         })
+    # Structural first (genuine negative space), then tooling (coverage gaps).
+    rows.sort(key=lambda r: 0 if r["failure_class"] == "structural" else 1)
     return rows
 
 

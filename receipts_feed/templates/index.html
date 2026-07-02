@@ -134,6 +134,18 @@ body a:hover{text-decoration:underline; text-decoration-thickness:1px; text-unde
   border:1px solid var(--rule); padding:0 .35rem; border-radius:3px;
   text-transform:uppercase; letter-spacing:.1em;
 }
+.iin-uncompiled-note{
+  font-family:var(--mono-iin); font-size:11px; color:var(--ink-faint);
+  letter-spacing:.02em; margin:.2rem 0 .6rem; line-height:1.5;
+}
+.iin-uncompiled .tag{
+  font-family:var(--mono-iin); font-size:9.5px; padding:0 .35rem;
+  border:1px solid var(--rule); border-radius:3px; letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.iin-uncompiled .tag.structural{color:var(--ink-dim)}
+.iin-uncompiled .tag.tooling{color:var(--amber); border-color:var(--amber-dim)}
+.iin-uncompiled .iin-bf-item[data-fc="tooling"]{opacity:.72}
 
 .iin-story h3{
   font-family:var(--serif-iin); font-weight:600;
@@ -368,13 +380,17 @@ body a:hover{text-decoration:underline; text-decoration-thickness:1px; text-unde
   {% if uncompiled %}
   <section class="iin-belowfold iin-uncompiled">
     <div class="iin-section">Uncompiled / No Receipts <span class="count">/ {{ uncompiled|length }}</span></div>
+    <p class="iin-uncompiled-note">
+      Structural gaps are posts with no citable source. <span class="tag tooling">Coverage</span>
+      gaps are sources our fetcher couldn&rsquo;t reach &mdash; a limit on our side, not a failed claim.
+    </p>
     <div class="iin-bf-grid">
       {% for u in uncompiled %}
-      <div class="iin-bf-item">
+      <div class="iin-bf-item" data-fc="{{ u.failure_class }}">
         <div class="t">
           {% if u.display_url or u.web_url %}<a href="{{ u.display_url or u.web_url }}" rel="noopener"{% if u.display_url %} target="_blank"{% endif %}>{{ u.headline or u.source_domain }}</a>{% else %}{{ u.headline or u.source_domain }}{% endif %}
         </div>
-        <span class="a">{% if u.source_domain %}{{ u.source_domain }} · {% endif %}<span class="tag">{{ u.reason }}</span></span>
+        <span class="a">{% if u.source_domain %}{{ u.source_domain }} · {% endif %}<span class="tag {{ 'tooling' if u.failure_class == 'tooling' else 'structural' }}">{{ u.reason }}</span></span>
       </div>
       {% endfor %}
     </div>

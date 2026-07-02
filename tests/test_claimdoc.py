@@ -31,6 +31,16 @@ from receipts_feed.claimdoc import (
     compile_claim,
     seal_digest,
 )
+from receipts_feed.claimdoc import (
+    FAIL_FETCH_ERROR,
+    FAIL_FETCH_UNREACHABLE,
+    FAIL_HANDLER_MISSING,
+    FAIL_NO_PRIMARY_SOURCE,
+    FAIL_SOURCE_BLOCKED,
+    FAILURE_CLASS_NONE,
+    FAILURE_CLASS_STRUCTURAL,
+    FAILURE_CLASS_TOOLING,
+)
 from receipts_feed.source_class import (
     SOURCE_CLASS_FILING,
     SOURCE_CLASS_GRAPH_NOTE,
@@ -199,8 +209,55 @@ class TestFreshness:
                              now=NOW).freshness == "stale"
 
 
+class TestFailureTaxonomy:
+    def test_handleable_domain_block_is_handler_missing(self):
+        # CourtListener 403 -> tooling coverage gap, NOT a claim failure.
+        doc = compile_claim(
+            _item(source_domain="courtlistener.com",
+                  canonical_url="https://courtlistener.com/docket/1/"),
+            _meta(fetch_status=403, domain="courtlistener.com"), now=NOW)
+        assert doc.claim_mode == CLAIM_MODE_CARRIER
+        assert doc.basis_failure == FAIL_HANDLER_MISSING
+        assert doc.failure_class == FAILURE_CLASS_TOOLING
+
+    def test_paywall_block_is_source_blocked(self):
+        doc = compile_claim(
+            _item(source_class=SOURCE_CLASS_REPORTING, source_domain="reuters.com",
+                  canonical_url="https://reuters.com/x"),
+            _meta(fetch_status=401, domain="reuters.com"), now=NOW)
+        assert doc.basis_failure == FAIL_SOURCE_BLOCKED
+        assert doc.failure_class == FAILURE_CLASS_TOOLING
+
+    def test_network_fail_is_unreachable(self):
+        doc = compile_claim(_item(), _meta(fetch_status=None), now=NOW)
+        assert doc.basis_failure == FAIL_FETCH_UNREACHABLE
+
+    def test_other_status_is_fetch_error(self):
+        doc = compile_claim(_item(), _meta(fetch_status=404), now=NOW)
+        assert doc.basis_failure == FAIL_FETCH_ERROR
+
+    def test_uncompiled_is_structural(self):
+        doc = compile_claim(_item(canonical_url="", external_uri=""), None, now=NOW)
+        assert doc.basis_failure == FAIL_NO_PRIMARY_SOURCE
+        assert doc.failure_class == FAILURE_CLASS_STRUCTURAL
+
+    def test_sourced_has_no_failure(self):
+        doc = compile_claim(_item(), _meta(), now=NOW)
+        assert doc.basis_failure == ""
+        assert doc.failure_class == FAILURE_CLASS_NONE
+
+    def test_rejection_is_structural(self):
+        rej = compile_claim(
+            _item(source_class=SOURCE_CLASS_UNKNOWN, source_domain="example.com",
+                  canonical_url="https://example.com/x"),
+            _meta(domain="example.com"), now=NOW)
+        assert isinstance(rej, Rejection)
+        assert rej.failure_class == FAILURE_CLASS_STRUCTURAL
+
+
 class TestToDict:
     def test_roundtrip_keys(self):
         d = compile_claim(_item(), _meta(), now=NOW).to_dict()
         assert d["claim_mode"] == CLAIM_MODE_SOURCED
         assert "text_carried" in d and "seal_digest" in d
+        assert "basis_failure" in d and "failure_class" in d

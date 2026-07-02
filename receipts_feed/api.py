@@ -364,10 +364,24 @@ async def debug_claims():
         by_mode.setdefault(d["claim_mode"], []).append(d)
     counts = {mode: len(v) for mode, v in by_mode.items()}
     counts["rejected"] = len(rejections)
+    # Split the negative space: structural (no citable claim) vs tooling
+    # (our fetcher couldn't reach a real source). Guards against tooling
+    # incapacity masquerading as claim failure.
+    failure_breakdown: dict[str, int] = {}
+    class_breakdown: dict[str, int] = {"structural": 0, "tooling": 0, "none": 0}
+    for d in docs:
+        bf = d.get("basis_failure") or ""
+        if bf:
+            failure_breakdown[bf] = failure_breakdown.get(bf, 0) + 1
+        fc = d.get("failure_class") or "none"
+        class_breakdown[fc] = class_breakdown.get(fc, 0) + 1
+    class_breakdown["structural"] += len(rejections)  # E006/E001 are structural
     return {
         "edition_id": edition_id,
         "total": len(docs),
         "counts": counts,
+        "failure_breakdown": failure_breakdown,
+        "class_breakdown": class_breakdown,
         "claims": by_mode,
         "rejections": rejections,
     }

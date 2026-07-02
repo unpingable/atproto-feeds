@@ -74,6 +74,81 @@ REJECT_REASONS = {
     E006_UNSETTLEABLE_CLASS: "Not a settleable source",
 }
 
+# --- basis failure taxonomy ------------------------------------------------
+# WHY a claim didn't resolve, split so tooling incapacity ("our fetcher is
+# blind") can never masquerade as claim failure ("the post lacks a source").
+# This does NOT change the compile predicate — basis_resolved is still exactly
+# fetch_status == 200. It only enriches the reason. Better hands, not a bigger brain.
+FAIL_NONE = ""                                  # resolved
+FAIL_NO_PRIMARY_SOURCE = "no_primary_source"    # structural: no external source at all
+FAIL_NOT_SETTLEABLE = "not_settleable_source"   # structural: source class isn't settleable
+FAIL_SOURCE_BLOCKED = "source_blocked"          # tooling: paywall/policy block (401/403/429)
+FAIL_HANDLER_MISSING = "handler_missing"        # tooling: block on a handleable public record — fixable
+FAIL_FETCH_ERROR = "fetch_error"                # tooling: other non-200 (404/5xx/...)
+FAIL_FETCH_UNREACHABLE = "fetch_unreachable"    # tooling: network failure / not fetched yet
+
+_STRUCTURAL_FAILURES = frozenset({FAIL_NO_PRIMARY_SOURCE, FAIL_NOT_SETTLEABLE})
+_TOOLING_FAILURES = frozenset({
+    FAIL_SOURCE_BLOCKED, FAIL_HANDLER_MISSING, FAIL_FETCH_ERROR, FAIL_FETCH_UNREACHABLE,
+})
+
+FAILURE_CLASS_STRUCTURAL = "structural"  # the claim genuinely lacks a citable source
+FAILURE_CLASS_TOOLING = "tooling"        # our fetcher couldn't reach a real source
+FAILURE_CLASS_NONE = "none"
+
+BASIS_FAILURE_REASONS = {
+    FAIL_NO_PRIMARY_SOURCE: "No primary source",
+    FAIL_NOT_SETTLEABLE: "Not a settleable source",
+    FAIL_SOURCE_BLOCKED: "Source blocked (paywall / anti-bot)",
+    FAIL_HANDLER_MISSING: "Fetch blocked — handler missing (fixable)",
+    FAIL_FETCH_ERROR: "Fetch error",
+    FAIL_FETCH_UNREACHABLE: "Source unreachable",
+}
+
+# Citation-native / public-record domains where a source handler is feasible.
+# A block on one of these is a coverage gap we can close (via an API handler),
+# not a doctrinal claim failure. Distinguishes "CourtListener blocked our naive
+# fetch" (handler_missing) from "Reuters paywall" (source_blocked).
+HANDLEABLE_DOMAINS = frozenset({
+    "courtlistener.com", "uscourts.gov", "supremecourt.gov", "pacer.gov",
+    "congress.gov", "federalregister.gov", "regulations.gov", "govinfo.gov",
+    "sec.gov", "gao.gov",
+    "ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov",
+    "arxiv.org", "documentcloud.org",
+})
+
+
+def _is_handleable(domain: str | None) -> bool:
+    if not domain:
+        return False
+    d = domain.lower().strip()
+    if d.startswith("www."):
+        d = d[4:]
+    return any(d == h or d.endswith("." + h) for h in HANDLEABLE_DOMAINS)
+
+
+def _basis_failure(url_meta: dict | None, source_domain: str) -> str:
+    """Classify WHY a carrier's basis didn't resolve. Never returns a
+    structural code — those are set at the E004/E006 sites."""
+    if not url_meta:
+        return FAIL_FETCH_UNREACHABLE  # no row yet — not reached
+    status = url_meta.get("fetch_status")
+    if status == 200:
+        return FAIL_NONE
+    if status in (401, 403, 429):
+        return FAIL_HANDLER_MISSING if _is_handleable(source_domain) else FAIL_SOURCE_BLOCKED
+    if status is not None:
+        return FAIL_FETCH_ERROR      # other 4xx/5xx
+    return FAIL_FETCH_UNREACHABLE    # status None -> network error
+
+
+def _failure_class(basis_failure: str) -> str:
+    if not basis_failure:
+        return FAILURE_CLASS_NONE
+    if basis_failure in _STRUCTURAL_FAILURES:
+        return FAILURE_CLASS_STRUCTURAL
+    return FAILURE_CLASS_TOOLING
+
 
 @dataclass(frozen=True)
 class ClaimDoc:
@@ -82,6 +157,8 @@ class ClaimDoc:
     basis_kind: str
     basis_resolved: bool   # fail-closed render gate
     reject_code: str | None
+    basis_failure: str     # "" if resolved; else why (structural vs tooling)
+    failure_class: str     # none | structural | tooling
     text_carried: str      # verbatim, never parsed
     canonical_url: str
     post_uri: str
@@ -105,6 +182,7 @@ class Rejection:
     reject_reason: str
     post_uri: str
     canonical_url: str
+    failure_class: str = FAILURE_CLASS_STRUCTURAL  # E001/E006 are both structural
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -204,7 +282,7 @@ def compile_claim(item: dict, url_meta: dict | None, *, now: datetime | None = N
     fetch_status = (url_meta or {}).get("fetch_status")
     fetched_at = (url_meta or {}).get("fetched_at")
 
-    def _doc(mode, basis_kind, basis_resolved, reject_code):
+    def _doc(mode, basis_kind, basis_resolved, reject_code, basis_failure):
         digest = seal_digest(text, canonical_url, post_uri, fetch_status, fetched_at, source_domain)
         return ClaimDoc(
             claim_id=digest,
@@ -212,6 +290,8 @@ def compile_claim(item: dict, url_meta: dict | None, *, now: datetime | None = N
             basis_kind=basis_kind,
             basis_resolved=basis_resolved,
             reject_code=reject_code,
+            basis_failure=basis_failure,
+            failure_class=_failure_class(basis_failure),
             text_carried=text,
             canonical_url=canonical_url,
             post_uri=post_uri,
@@ -228,7 +308,8 @@ def compile_claim(item: dict, url_meta: dict | None, *, now: datetime | None = N
 
     # #2 external source present (non-platform)
     if not canonical_url or _domains.is_platform_domain(source_domain):
-        return _doc(CLAIM_MODE_UNCOMPILED, BASIS_NONE, False, E004_MISSING_SETTLEMENT)
+        return _doc(CLAIM_MODE_UNCOMPILED, BASIS_NONE, False,
+                    E004_MISSING_SETTLEMENT, FAIL_NO_PRIMARY_SOURCE)
 
     # #4 settleable source class
     if source_class not in SETTLEABLE_CLASSES:
@@ -243,8 +324,11 @@ def compile_claim(item: dict, url_meta: dict | None, *, now: datetime | None = N
     basis_resolved = bool(url_meta) and fetch_status == 200 and bool(fetched_at)
     if not basis_resolved:
         # Fail-closed: external settleable source but basis unresolved -> carrier.
-        return _doc(CLAIM_MODE_CARRIER, BASIS_CARRIER, False, E005_UNRESOLVED_BASIS)
+        # The WHY (blocked / handler-missing / error / unreachable) is tooling,
+        # not a claim failure — recorded so the negative surface can't lie.
+        return _doc(CLAIM_MODE_CARRIER, BASIS_CARRIER, False,
+                    E005_UNRESOLVED_BASIS, _basis_failure(url_meta, source_domain))
 
     if source_class in PRIMARY_CLASSES:
-        return _doc(CLAIM_MODE_SOURCED, BASIS_PRIMARY, True, None)
-    return _doc(CLAIM_MODE_REPORTED, BASIS_REPORTING, True, None)
+        return _doc(CLAIM_MODE_SOURCED, BASIS_PRIMARY, True, None, FAIL_NONE)
+    return _doc(CLAIM_MODE_REPORTED, BASIS_REPORTING, True, None, FAIL_NONE)

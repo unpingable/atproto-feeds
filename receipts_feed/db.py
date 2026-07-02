@@ -211,9 +211,17 @@ def init_db():
             admissibility REAL DEFAULT 0,
             text_carried TEXT,
             compiled_at TEXT,
+            basis_failure TEXT,
+            failure_class TEXT,
             PRIMARY KEY (edition_id, post_uri)
         )
     """)
+    # Additive column migration for DBs created before the failure taxonomy.
+    for _col in ("basis_failure", "failure_class"):
+        try:
+            conn.execute(f"ALTER TABLE claimdocs ADD COLUMN {_col} TEXT")
+        except sqlite3.OperationalError:
+            pass  # already present
     conn.execute("""
         CREATE TABLE IF NOT EXISTS claim_rejections (
             edition_id TEXT,
@@ -839,6 +847,7 @@ _CLAIMDOC_COLS = [
     "claim_id", "claim_mode", "basis_kind", "basis_resolved", "reject_code",
     "canonical_url", "source_domain", "source_class", "fetch_status", "fetched_at",
     "adequacy", "freshness", "seal_digest", "admissibility", "text_carried", "compiled_at",
+    "basis_failure", "failure_class",
 ]
 
 
