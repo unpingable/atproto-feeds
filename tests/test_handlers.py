@@ -73,6 +73,43 @@ class TestFetchAndStoreDispatch:
         assert out["og_title"] == "G"
 
 
+class TestCrossref:
+    def test_extract_doi_from_nature(self):
+        assert handlers._extract_doi("https://nature.com/articles/s41586-026-10738-7") == "10.1038/s41586-026-10738-7"
+        # .epdf?sharing_token suffix must not pollute the DOI
+        assert handlers._extract_doi("https://nature.com/articles/s41558-026-02642-9.epdf?x=y") == "10.1038/s41558-026-02642-9"
+
+    def test_extract_doi_from_path(self):
+        assert handlers._extract_doi("https://www.science.org/doi/10.1126/science.adw0491") == "10.1126/science.adw0491"
+        assert handlers._extract_doi("https://doi.org/10.1073/pnas.2401234121") == "10.1073/pnas.2401234121"
+
+    def test_extract_doi_none(self):
+        assert handlers._extract_doi("https://nature.com/subjects/genetics") is None
+        assert handlers._extract_doi("https://example.com/x") is None
+
+    def test_routes_academic_domains(self):
+        assert handlers.get_handler("nature.com") is handlers.crossref_handler
+        assert handlers.get_handler("www.science.org") is handlers.crossref_handler
+        assert handlers.get_handler("pnas.org") is handlers.crossref_handler
+
+    def test_resolves_title_and_journal(self, monkeypatch):
+        fake = {"message": {"title": ["Similar neural responses predict friendship"],
+                            "container-title": ["Nature Communications"]}}
+        monkeypatch.setattr(handlers, "_get_json", lambda url, *, timeout: fake)
+        out = handlers.crossref_handler("https://nature.com/articles/s41467-017-02722-7", timeout=8)
+        assert out["fetch_status"] == 200
+        assert out["og_title"] == "Similar neural responses predict friendship"
+        assert out["og_description"] == "Nature Communications"
+
+    def test_no_doi_returns_none(self, monkeypatch):
+        monkeypatch.setattr(handlers, "_get_json", lambda url, *, timeout: {})
+        assert handlers.crossref_handler("https://nature.com/subjects/x", timeout=8) is None
+
+    def test_api_failure_returns_none(self, monkeypatch):
+        monkeypatch.setattr(handlers, "_get_json", lambda url, *, timeout: None)
+        assert handlers.crossref_handler("https://doi.org/10.1038/x", timeout=8) is None
+
+
 class TestInterstitial:
     def test_detected_by_host(self):
         assert og_fetch._is_interstitial("https://unblock.federalregister.gov/x", "anything")

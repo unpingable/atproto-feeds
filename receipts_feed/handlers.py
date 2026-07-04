@@ -76,9 +76,60 @@ def pubmed_handler(url: str, *, timeout: float) -> dict | None:
     }
 
 
+# --- Crossref (DOI -> title/journal) ---------------------------------------
+# Academic publishers (nature, science, pnas, biorxiv) sit behind JS bot walls
+# that return an interstitial, so a naive fetch can't get the title. But every
+# article carries a DOI, and Crossref resolves DOI -> title anonymously. One
+# handler reclaims the whole DOI-bearing academic tier.
+_DOI_RE = re.compile(r"(10\.\d{4,9}/[^\s?#]+)")
+_CROSSREF = "https://api.crossref.org/works/{doi}?mailto=instantinternet.news"
+
+
+def _extract_doi(url: str) -> str | None:
+    # Nature article IDs ARE the DOI suffix under 10.1038 (…/articles/<id>).
+    m = re.search(r"nature\.com/articles/([^/?#.]+)", url, re.IGNORECASE)
+    if m:
+        return "10.1038/" + m.group(1)
+    # Otherwise a DOI embedded in the path (science.org/doi/…, pnas.org/doi/…,
+    # biorxiv.org/content/…, doi.org/…).
+    m = _DOI_RE.search(url)
+    if m:
+        return m.group(1).rstrip("/.")
+    return None
+
+
+def crossref_handler(url: str, *, timeout: float) -> dict | None:
+    doi = _extract_doi(url)
+    if not doi:
+        return None
+    data = _get_json(_CROSSREF.format(doi=doi), timeout=timeout)
+    if not data:
+        return None
+    msg = data.get("message") or {}
+    title = ((msg.get("title") or [""])[0] or "").strip()
+    if not title:
+        return None
+    journal = (msg.get("container-title") or [None])[0]
+    return {
+        "final_url": url,
+        "content_type": "application/json",
+        "fetch_status": 200,
+        "fetch_error": None,
+        "og_title": title,
+        "og_description": journal,
+        "og_image": None,
+    }
+
+
 # Domain -> handler. Suffix-matched by get_handler (so subdomains resolve).
 DOMAIN_HANDLERS: dict[str, callable] = {
     "pubmed.ncbi.nlm.nih.gov": pubmed_handler,
+    "nature.com": crossref_handler,
+    "science.org": crossref_handler,
+    "pnas.org": crossref_handler,
+    "biorxiv.org": crossref_handler,
+    "medrxiv.org": crossref_handler,
+    "doi.org": crossref_handler,
 }
 
 
