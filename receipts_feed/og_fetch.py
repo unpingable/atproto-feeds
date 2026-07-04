@@ -62,8 +62,10 @@ FETCH_TIMEOUT_SECONDS = 6.0
 # locked door. Demote to a blocked fetch so the ledger reads it as a coverage gap.
 _INTERSTITIAL_HOSTS = {"unblock.federalregister.gov"}
 _ACCESS_DENIED_TITLE_RE = re.compile(
-    r"request access|access denied|just a moment|attention required|"
-    r"are you (?:a )?human|verify you are (?:a )?human|enable javascript|captcha",
+    r"client challenge|request access|access denied|just a moment|"
+    r"attention required|checking your browser|checking if the site connection|"
+    r"you have been blocked|are you (?:a )?(?:human|robot)|"
+    r"verify(?:ing)? (?:that )?you are (?:a )?human|enable javascript|captcha",
     re.IGNORECASE,
 )
 

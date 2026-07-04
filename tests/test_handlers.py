@@ -81,6 +81,8 @@ class TestInterstitial:
         assert og_fetch._is_interstitial("https://www.federalregister.gov/x",
                                          "Federal Register :: Request Access")
         assert og_fetch._is_interstitial("https://x.com/y", "Just a moment...")
+        # Nature's Radware bot-challenge page (returns 200 + this title).
+        assert og_fetch._is_interstitial("https://www.nature.com/articles/d41", "Client Challenge")
 
     def test_clean_page_not_interstitial(self):
         assert not og_fetch._is_interstitial("https://reuters.com/x", "A Real Headline")
